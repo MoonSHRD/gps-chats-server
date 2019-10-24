@@ -32,7 +32,13 @@ func (db *Database) GetDatabaseConnection() *pg.DB {
 }
 
 func (db *Database) CloseConnection() error {
-	return db.dbConnection.Close()
+	err := db.dbConnection.Close()
+	if err != nil {
+		return err
+	}
+	db.dbConnection = nil
+
+	return nil
 }
 
 func (db *Database) initializeDbSchema() error {
