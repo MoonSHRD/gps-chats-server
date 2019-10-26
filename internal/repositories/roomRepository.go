@@ -31,13 +31,13 @@ func NewRoomRepository(db *database.Database) (*RoomRepository, error) {
 	return nil, fmt.Errorf("database connection is null")
 }
 
-func (rr *RoomRepository) CreateRoom(room models.Room) error {
-	err := rr.db.GetDatabaseConnection().Insert(&room)
+func (rr *RoomRepository) PutRoom(room *models.Room) error {
+	err := rr.db.GetDatabaseConnection().Insert(room)
 	if err != nil {
 		return err
 	}
 	rr.deletingRoomScheduler.Delay().Second(room.TTL).Do(func() {
-		err := rr.db.GetDatabaseConnection().Delete(&room)
+		err := rr.db.GetDatabaseConnection().Delete(room)
 		if err != nil {
 			rr.logger.Error("Cannot delete room " + room.RoomID + ". Reason: " + err.Error())
 		}
