@@ -5,14 +5,21 @@ import (
 	"os/signal"
 	"syscall"
 
+	internalCtx "github.com/MoonSHRD/sonis/internal/context"
+
 	"github.com/sirupsen/logrus"
 )
 
 var logger = logrus.New()
+var context *internalCtx.Context
 
 func main() {
+	var err error
 	logger.Info("Starting microservice...")
-
+	context, err = internalCtx.New()
+	if err != nil {
+		os.Exit(1)
+	}
 	logger.Info("Microservice successfully started!")
 
 	// CTRL+C handler.
@@ -21,7 +28,7 @@ func main() {
 	signal.Notify(signalHandler, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-signalHandler
-		logger.Info("CTRL+C or SIGTERM received, shutting down openkeepd...")
+		logger.Info("CTRL+C or SIGTERM received, shutting down sonisd...")
 		// TODO make graceful shutdown of microservice
 		shutdownDone <- true
 	}()
