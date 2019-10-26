@@ -29,7 +29,7 @@ func main() {
 	go func() {
 		<-signalHandler
 		logger.Info("CTRL+C or SIGTERM received, shutting down sonisd...")
-		// TODO make graceful shutdown of microservice
+		context.Destroy()
 		shutdownDone <- true
 	}()
 

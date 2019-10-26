@@ -29,3 +29,8 @@ func New() (*Context, error) {
 		Webserver: ws,
 	}, nil
 }
+
+func (ctx *Context) Destroy() {
+	ctx.DB.CloseConnection()
+	ctx.Webserver.Destroy()
+}
