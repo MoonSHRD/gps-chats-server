@@ -1,6 +1,8 @@
 package webserver
 
 import (
+	"context"
+
 	"github.com/MoonSHRD/sonis/internal/database"
 	"github.com/MoonSHRD/sonis/internal/httpHandler"
 	echo "github.com/labstack/echo/v4"
@@ -32,4 +34,8 @@ func New(db *database.Database) (*Webserver, error) {
 	}
 	webserver.logger.Info("Started listening on http://localhost:37642/")
 	return webserver, nil
+}
+
+func (ws *Webserver) Destroy() {
+	ws.echo.Shutdown(context.Background())
 }
