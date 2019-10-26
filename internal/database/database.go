@@ -17,7 +17,7 @@ func New() (*Database, error) {
 			User:     "postgres",
 			Password: "postgres",
 			Database: "sonis",
-			Addr:     "localhost:5432",
+			Addr:     "localhost:15432",
 		}), // FIXME make options dynamic
 	}
 	err = db.initializeDbSchema()
