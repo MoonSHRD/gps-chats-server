@@ -12,8 +12,9 @@ import (
 )
 
 const (
-	PutRoomError  = 1
-	GetRoomsError = 2
+	PutRoomError    = 1
+	GetRoomsError   = 2
+	GetRoomByRoomID = 3
 )
 
 type HttpHandler struct {
@@ -76,6 +77,18 @@ func (h *HttpHandler) HandleGetRoomsRequest(eCtx echo.Context) error {
 		return err
 	}
 	eCtx.JSON(http.StatusOK, rooms)
+	return nil
+}
+
+func (h *HttpHandler) HandleGetRoomByRoomID(eCtx echo.Context) error {
+	roomID := eCtx.Param("room_id")
+	room, err := h.roomRepository.GetRoomByRoomID(roomID)
+	if err != nil {
+		h.logger.Errorf("Processing of /rooms/%s request failed! Reason: %s", roomID, err.Error())
+		eCtx.JSON(http.StatusInternalServerError, makeHTTPError(GetRoomByRoomID, err.Error()))
+		return err
+	}
+	eCtx.JSON(http.StatusOK, room)
 	return nil
 }
 
