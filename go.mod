@@ -6,6 +6,7 @@ require (
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/labstack/echo/v4 v4.1.11
+	github.com/lib/pq v1.2.0
 	github.com/pkg/errors v0.8.1 // indirect
 	github.com/pressly/goose v2.6.0+incompatible
 	github.com/prprprus/scheduler v0.5.0

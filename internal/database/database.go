@@ -5,6 +5,8 @@ import (
 
 	"github.com/MoonSHRD/sonis/internal/database/migrations"
 	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq" // for sqlx
+	"github.com/sirupsen/logrus"
 )
 
 type Database struct {
@@ -13,7 +15,8 @@ type Database struct {
 
 func New() (*Database, error) {
 	var err error
-	connectionString := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%d", "postgres", "postgres", "sonis", "localhost", 15432) // FIXME make options dynamic
+	logger := logrus.New()
+	connectionString := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%d sslmode=%s", "postgres", "postgres", "sonis", "localhost", 15432, "disable") // FIXME make options dynamic
 	dbConnection, err := sqlx.Connect("postgres", connectionString)
 	if err != nil {
 		return nil, err
@@ -24,6 +27,7 @@ func New() (*Database, error) {
 
 	err = migrations.New(db.dbConnection.DB).Migrate()
 	if err != nil {
+		logger.Errorf("Failed to process the migration. Reason: %s", err.Error())
 		return nil, err
 	}
 	return db, nil
