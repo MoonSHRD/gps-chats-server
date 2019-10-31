@@ -36,7 +36,7 @@ func (h *HttpHandler) HandlePutRoomRequest(eCtx echo.Context) error {
 	var room models.Room
 	err := eCtx.Bind(&room)
 	if err != nil {
-		h.logger.Errorf("Processing of /putRoom request failed! Reason: %s", err.Error())
+		h.logger.Errorf("Processing of /rooms/put request failed! Reason: %s", err.Error())
 		eCtx.JSON(http.StatusInternalServerError, makeHTTPError(PutRoomError, err.Error()))
 		return err
 	}
@@ -52,26 +52,26 @@ func (h *HttpHandler) HandleGetRoomsRequest(eCtx echo.Context) error {
 
 	userLat, err := strconv.ParseFloat(userLatStr, 32)
 	if err != nil {
-		h.logger.Errorf("Processing of /getRooms request failed! Reason: %s", err.Error())
+		h.logger.Errorf("Processing of /rooms/getByCoords request failed! Reason: %s", err.Error())
 		eCtx.JSON(http.StatusBadRequest, makeHTTPError(GetRoomsError, err.Error()))
 		return err
 	}
 	userLon, err := strconv.ParseFloat(userLonStr, 32)
 	if err != nil {
-		h.logger.Errorf("Processing of /getRooms request failed! Reason: %s", err.Error())
+		h.logger.Errorf("Processing of /rooms/getByCoords request failed! Reason: %s", err.Error())
 		eCtx.JSON(http.StatusBadRequest, makeHTTPError(GetRoomsError, err.Error()))
 		return err
 	}
 	radius, err := strconv.Atoi(radiusStr)
 	if err != nil {
-		h.logger.Errorf("Processing of /getRooms request failed! Reason: %s", err.Error())
+		h.logger.Errorf("Processing of /rooms/getByCoords request failed! Reason: %s", err.Error())
 		eCtx.JSON(http.StatusBadRequest, makeHTTPError(GetRoomsError, err.Error()))
 		return err
 	}
 
 	rooms, err := h.roomRepository.GetRoomsByCoords(userLat, userLon, radius)
 	if err != nil {
-		h.logger.Errorf("Processing of /getRooms request failed! Reason: %s", err.Error())
+		h.logger.Errorf("Processing of /rooms/getByCoords request failed! Reason: %s", err.Error())
 		eCtx.JSON(http.StatusInternalServerError, makeHTTPError(GetRoomsError, err.Error()))
 		return err
 	}

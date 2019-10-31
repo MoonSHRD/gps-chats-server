@@ -26,8 +26,8 @@ func New(db *database.Database) (*Webserver, error) {
 		logger:      logrus.New(),
 	}
 
-	webserver.echo.POST("/putRoom", httpHandler.HandlePutRoomRequest)
-	webserver.echo.GET("/getRooms", httpHandler.HandleGetRoomsRequest)
+	webserver.echo.POST("/rooms/put", httpHandler.HandlePutRoomRequest)
+	webserver.echo.GET("/rooms/getByCoords", httpHandler.HandleGetRoomsRequest)
 
 	webserver.echo.HideBanner = true
 	err = webserver.echo.Start(":37642")
