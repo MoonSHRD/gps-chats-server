@@ -27,6 +27,7 @@ func New(db *database.Database) (*Webserver, error) {
 	}
 
 	webserver.echo.POST("/putRoom", httpHandler.HandlePutRoomRequest)
+	webserver.echo.GET("/getRooms", httpHandler.HandleGetRoomsRequest)
 
 	webserver.echo.HideBanner = true
 	err = webserver.echo.Start(":37642")
