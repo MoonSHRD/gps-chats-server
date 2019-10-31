@@ -41,7 +41,12 @@ func (h *HttpHandler) HandlePutRoomRequest(eCtx echo.Context) error {
 		eCtx.JSON(http.StatusInternalServerError, makeHTTPError(PutRoomError, err.Error()))
 		return err
 	}
-	h.roomRepository.PutRoom(&room)
+	err = h.roomRepository.PutRoom(&room)
+	if err != nil {
+		h.logger.Errorf("Processing of /rooms/put request failed! Reason: %s", err.Error())
+		eCtx.JSON(http.StatusInternalServerError, makeHTTPError(PutRoomError, err.Error()))
+		return err
+	}
 	eCtx.JSON(http.StatusOK, room)
 	return nil
 }

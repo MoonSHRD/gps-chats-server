@@ -33,6 +33,9 @@ func NewRoomRepository(db *database.Database) (*RoomRepository, error) {
 
 func (rr *RoomRepository) PutRoom(room *models.Room) error {
 	stmt, err := rr.db.GetDatabaseConnection().Preparex("INSERT INTO rooms (latitude, longitude, ttl, room_id, category) VALUES (?, ?, ?, ?, ?);")
+	if err != nil {
+		return err
+	}
 	res, err := stmt.Exec(room.Latitude, room.Longitude, room.TTL, room.RoomID, room.Category)
 	if err != nil {
 		return err
