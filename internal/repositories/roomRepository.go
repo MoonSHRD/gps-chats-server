@@ -3,30 +3,42 @@ package repositories
 import (
 	"fmt"
 
+	"github.com/MoonSHRD/sonis/internal/utils"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/MoonSHRD/sonis/internal/database"
 	"github.com/MoonSHRD/sonis/internal/models"
-	"github.com/prprprus/scheduler"
+)
+
+const (
+	// Minute represents one minute in seconds
+	Minute = 60
+
+	// Hour represents one hour in seconds
+	Hour = 60 * Minute
+
+	// Day represents one day in seconds
+	Day = 24 * Hour
+
+	// Month represents one month in seconds
+	Month = 31 * Day
 )
 
 type RoomRepository struct {
-	db                    *database.Database
-	deletingRoomScheduler *scheduler.Scheduler
-	logger                *logrus.Logger
+	db     *database.Database
+	logger *logrus.Logger
 }
 
 func NewRoomRepository(db *database.Database) (*RoomRepository, error) {
 	if db != nil {
-		deletingRoomScheduler, err := scheduler.NewScheduler(10000)
-		if err != nil {
-			return nil, err
+		roomRepo := &RoomRepository{
+			db:     db,
+			logger: logrus.New(),
 		}
-		return &RoomRepository{
-			db:                    db,
-			deletingRoomScheduler: deletingRoomScheduler,
-			logger:                logrus.New(),
-		}, nil
+		roomRepo.clearExpiredRecords()
+		executeEveryMinutes(roomRepo.clearExpiredRecords, 5)
+		return roomRepo, nil
 	}
 	return nil, fmt.Errorf("database connection is null")
 }
@@ -37,13 +49,21 @@ func (rr *RoomRepository) PutRoom(room *models.Room) (*models.Room, error) {
 		return nil, err
 	}
 	stmt.QueryRow(room.Latitude, room.Longitude, room.TTL, room.RoomID, room.Category).Scan(&room.ID, &room.CreatedAt)
-	rr.deletingRoomScheduler.Delay().Second(room.TTL).Do(func() {
+
+	seconds := room.TTL
+	if seconds > Month {
+		return nil, fmt.Errorf("creating chats for more than one month is prohibited")
+	}
+
+	var stopChan chan bool
+	stopChan = utils.SetInterval(func() {
 		stmt, err := rr.db.GetDatabaseConnection().Preparex("DELETE FROM rooms WHERE id = $1;")
 		_, err = stmt.Exec(room.ID)
 		if err != nil {
 			rr.logger.Errorf("Cannot delete room %d. Reason: %s", room.ID, err.Error())
 		}
-	})
+		stopChan <- true
+	}, seconds*1000, true)
 	return room, nil
 }
 
@@ -71,4 +91,25 @@ func (rr *RoomRepository) GetRoomByRoomID(roomID string) (*models.Room, error) {
 	var room models.Room
 	stmt.Get(&room, roomID)
 	return &room, nil
+}
+
+func (rr *RoomRepository) clearExpiredRecords() {
+	res, err := rr.db.GetDatabaseConnection().Exec("DELETE FROM rooms WHERE created_at <= now() AT TIME ZONE 'UTC' - interval '1 second' * rooms.ttl")
+	if err != nil {
+		rr.logger.Errorf("Failed to clear expired records in database! %s", err.Error())
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		rr.logger.Errorf("Failed to clear expired records in database! %s", err.Error())
+	}
+	if rowsAffected > 0 {
+		rr.logger.Infof("Cleaned up database from %d expired records", rowsAffected)
+	}
+}
+
+// executeEveryMinutes executes given function every N minutes
+// FIXME Should be not as crunch
+func executeEveryMinutes(fn func(), minutePeriod int) {
+	millisecs := 60000 * minutePeriod
+	utils.SetInterval(fn, millisecs, true)
 }
