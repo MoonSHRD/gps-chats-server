@@ -41,20 +41,21 @@ func (h *HttpHandler) HandlePutRoomRequest(eCtx echo.Context) error {
 		eCtx.JSON(http.StatusInternalServerError, makeHTTPError(PutRoomError, err.Error()))
 		return err
 	}
-	err = h.roomRepository.PutRoom(&room)
+	roomID, err := h.roomRepository.PutRoom(&room)
 	if err != nil {
 		h.logger.Errorf("Processing of /rooms/put request failed! Reason: %s", err.Error())
 		eCtx.JSON(http.StatusInternalServerError, makeHTTPError(PutRoomError, err.Error()))
 		return err
 	}
+	room.ID = roomID
 	eCtx.JSON(http.StatusOK, room)
 	return nil
 }
 
 func (h *HttpHandler) HandleGetRoomsRequest(eCtx echo.Context) error {
-	userLatStr := eCtx.Param("gps_lat")
-	userLonStr := eCtx.Param("gps_lon")
-	radiusStr := eCtx.Param("radius")
+	userLatStr := eCtx.QueryParam("gps_lat")
+	userLonStr := eCtx.QueryParam("gps_lon")
+	radiusStr := eCtx.QueryParam("radius")
 
 	userLat, err := strconv.ParseFloat(userLatStr, 32)
 	if err != nil {
