@@ -31,21 +31,20 @@ func NewRoomRepository(db *database.Database) (*RoomRepository, error) {
 	return nil, fmt.Errorf("database connection is null")
 }
 
-func (rr *RoomRepository) PutRoom(room *models.Room) (int64, error) {
-	stmt, err := rr.db.GetDatabaseConnection().Preparex("INSERT INTO rooms (latitude, longitude, ttl, room_id, category) VALUES ($1, $2, $3, $4, $5) RETURNING id;")
+func (rr *RoomRepository) PutRoom(room *models.Room) (*models.Room, error) {
+	stmt, err := rr.db.GetDatabaseConnection().Preparex("INSERT INTO rooms (latitude, longitude, ttl, room_id, category) VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at;")
 	if err != nil {
-		return -1, err
+		return nil, err
 	}
-	var roomID int64
-	stmt.QueryRow(room.Latitude, room.Longitude, room.TTL, room.RoomID, room.Category).Scan(&roomID)
+	stmt.QueryRow(room.Latitude, room.Longitude, room.TTL, room.RoomID, room.Category).Scan(&room.ID, &room.CreatedAt)
 	rr.deletingRoomScheduler.Delay().Second(room.TTL).Do(func() {
 		stmt, err := rr.db.GetDatabaseConnection().Preparex("DELETE FROM rooms WHERE id = $1;")
-		_, err = stmt.Exec(roomID)
+		_, err = stmt.Exec(room.ID)
 		if err != nil {
-			rr.logger.Error("Cannot delete room " + room.RoomID + ". Reason: " + err.Error())
+			rr.logger.Errorf("Cannot delete room %d. Reason: %s", room.ID, err.Error())
 		}
 	})
-	return roomID, nil
+	return room, nil
 }
 
 func (rr *RoomRepository) GetRoomsByCoords(userLat float64, userLon float64, radius int) (*[]models.Room, error) {
@@ -57,6 +56,9 @@ func (rr *RoomRepository) GetRoomsByCoords(userLat float64, userLon float64, rad
 	err = stmt.Select(&rooms, userLat, userLon, radius)
 	if err != nil {
 		return nil, err
+	}
+	if rooms == nil {
+		rooms = make([]models.Room, 0)
 	}
 	return &rooms, nil
 }
