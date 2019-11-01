@@ -19,7 +19,7 @@ const (
 	`
 )
 
-func InitialUp(tx *sql.Tx) error {
+func Up001(tx *sql.Tx) error {
 	_, err := tx.Exec(createRoomsTable)
 	return err
 }

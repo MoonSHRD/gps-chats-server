@@ -18,7 +18,8 @@ func New(dbConn *sql.DB) *Migration {
 
 func (m *Migration) Migrate() error {
 	goose.SetDialect("postgres")
-	goose.AddNamedMigration("1_initial.go", InitialUp, nil)
+	goose.AddNamedMigration("1_initial.go", Up001, nil)
+	goose.AddNamedMigration("2_changeCreatedAtType.go", Up002, nil)
 
 	if m.dbConn != nil {
 		err := goose.Up(m.dbConn, ".")
