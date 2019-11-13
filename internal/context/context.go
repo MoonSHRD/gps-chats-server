@@ -2,6 +2,7 @@ package context
 
 import (
 	"github.com/MoonSHRD/sonis/internal/database"
+	"github.com/MoonSHRD/sonis/internal/utils"
 	"github.com/MoonSHRD/sonis/internal/webserver"
 	"github.com/sirupsen/logrus"
 )
@@ -12,9 +13,9 @@ type Context struct {
 	Logger    *logrus.Logger
 }
 
-func New() (*Context, error) {
+func New(cfg utils.Config) (*Context, error) {
 	logger := logrus.New()
-	db, err := database.New()
+	db, err := database.New(cfg)
 	if err != nil {
 		logger.Error("Failed to initialize database. Reason: " + err.Error())
 		return nil, err
