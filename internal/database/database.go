@@ -3,7 +3,6 @@ package database
 import (
 	"fmt"
 
-	"github.com/MoonSHRD/sonis/internal/database/migrations"
 	"github.com/MoonSHRD/sonis/internal/utils"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq" // for sqlx
@@ -26,7 +25,7 @@ func New(cfg utils.Config) (*Database, error) {
 		dbConnection: dbConnection,
 	}
 
-	err = migrations.New(db.dbConnection.DB).Migrate()
+	err = NewMigrations(db.dbConnection.DB).Migrate()
 	if err != nil {
 		logger.Errorf("Failed to process the migration. Reason: %s", err.Error())
 		return nil, err

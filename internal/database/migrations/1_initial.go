@@ -1,9 +1,7 @@
 package migrations
 
-import "database/sql"
-
 const (
-	createRoomsTable = `
+	_1Up = `
 		CREATE TABLE rooms
 		(
 			id SERIAL
@@ -17,9 +15,7 @@ const (
 			created_at TIMESTAMP DEFAULT now() NOT NULL
 		);
 	`
+	_1Down = `
+		DROP TABLE rooms;
+	`
 )
-
-func Up001(tx *sql.Tx) error {
-	_, err := tx.Exec(createRoomsTable)
-	return err
-}
