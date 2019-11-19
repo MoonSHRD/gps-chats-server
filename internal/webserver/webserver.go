@@ -2,6 +2,8 @@ package webserver
 
 import (
 	"context"
+	"fmt"
+	"github.com/MoonSHRD/sonis/internal/utils"
 
 	"github.com/MoonSHRD/sonis/internal/database"
 	"github.com/MoonSHRD/sonis/internal/httpHandler"
@@ -15,7 +17,7 @@ type Webserver struct {
 	logger      *logrus.Logger
 }
 
-func New(db *database.Database) (*Webserver, error) {
+func New(cfg *utils.Config, db *database.Database) (*Webserver, error) {
 	httpHandler, err := httpHandler.New(db)
 	if err != nil {
 		return nil, err
@@ -31,7 +33,10 @@ func New(db *database.Database) (*Webserver, error) {
 	webserver.echo.GET("/rooms/:room_id", httpHandler.HandleGetRoomByRoomID)
 
 	webserver.echo.HideBanner = true
-	err = webserver.echo.Start(":37642")
+	if cfg.WebserverPort <= 0 || cfg.WebserverPort > 65535 {
+		return nil, fmt.Errorf("incorrect port %d", cfg.WebserverPort)
+	}
+	err = webserver.echo.Start(fmt.Sprintf(":%d", cfg.WebserverPort))
 	if err != nil {
 		return nil, err
 	}
