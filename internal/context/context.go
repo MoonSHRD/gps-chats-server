@@ -20,7 +20,7 @@ func New(cfg utils.Config) (*Context, error) {
 		logger.Error("Failed to initialize database. Reason: " + err.Error())
 		return nil, err
 	}
-	ws, err := webserver.New(db)
+	ws, err := webserver.New(&cfg, db)
 	if err != nil {
 		logger.Error("Failed to initialize webserver. Reason: " + err.Error())
 		return nil, err

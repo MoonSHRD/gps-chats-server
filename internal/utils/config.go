@@ -6,4 +6,5 @@ type Config struct {
 	DatabaseName     string `yaml:"databaseName"`
 	DatabaseHost     string `yaml:"databaseHost"`
 	DatabasePort     int    `yaml:"databasePort"`
+	WebserverPort    int    `yaml:"webserverPort"`
 }
