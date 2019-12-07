@@ -1,2 +1,4 @@
 /sonisd
+/.sonis-config.yaml
 /devzone/postgresql
+/.idea
