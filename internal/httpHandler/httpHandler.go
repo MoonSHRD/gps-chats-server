@@ -18,12 +18,17 @@ const (
 )
 
 type HttpHandler struct {
-	roomRepository *repositories.RoomRepository
-	logger         *logrus.Logger
+	roomRepository         *repositories.RoomRepository
+	chatCategoryRepository *repositories.ChatCategoryRepository
+	logger                 *logrus.Logger
 }
 
 func New(db *database.Database) (*HttpHandler, error) {
-	roomRepository, err := repositories.NewRoomRepository(db)
+	chatCategoryRepository, err := repositories.NewChatCategoryRepository(db)
+	if err != nil {
+		return nil, err
+	}
+	roomRepository, err := repositories.NewRoomRepository(db, chatCategoryRepository)
 	if err != nil {
 		return nil, err
 	}
@@ -94,6 +99,33 @@ func (h *HttpHandler) HandleGetRoomByRoomID(eCtx echo.Context) error {
 		return err
 	}
 	eCtx.JSON(http.StatusOK, room)
+	return nil
+}
+
+func (h *HttpHandler) HandleGetAllRooms(eCtx echo.Context) error {
+	rooms, err := h.roomRepository.GetAllRooms()
+	if err != nil {
+		h.logger.Errorf("Processing of /rooms request failed! Reason: %s", err.Error())
+		_ = eCtx.JSON(http.StatusInternalServerError, makeHTTPError(GetRoomByRoomID, err.Error()))
+		return err
+	}
+	_ = eCtx.JSON(http.StatusOK, rooms)
+	return nil
+}
+
+func (h *HttpHandler) HandleGetRoomsByCategoryID(eCtx echo.Context) error {
+	categoryIDStr := eCtx.Param("category_id")
+	categoryID, err := strconv.Atoi(categoryIDStr)
+	if err != nil {
+		return err
+	}
+	rooms, err := h.roomRepository.GetRoomsByCategoryID(categoryID)
+	if err != nil {
+		h.logger.Errorf("Processing of /rooms/byCategory/%d request failed! Reason: %s", categoryID, err.Error())
+		_ = eCtx.JSON(http.StatusInternalServerError, makeHTTPError(GetRoomByRoomID, err.Error()))
+		return err
+	}
+	_ = eCtx.JSON(http.StatusOK, rooms)
 	return nil
 }
 
