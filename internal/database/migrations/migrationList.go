@@ -17,6 +17,16 @@ var (
 				Up:   []string{_2Up},
 				Down: []string{_2Down},
 			},
+			&migrate.Migration{
+				Id:   "3",
+				Up:   []string{_3Up},
+				Down: []string{_3Down},
+			},
+			&migrate.Migration{
+				Id:   "4",
+				Up:   []string{_4Up},
+				Down: []string{_4Down},
+			},
 		},
 	}
 )
