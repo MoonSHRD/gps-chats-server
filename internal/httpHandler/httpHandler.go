@@ -33,8 +33,9 @@ func New(db *database.Database) (*HttpHandler, error) {
 		return nil, err
 	}
 	return &HttpHandler{
-		roomRepository: roomRepository,
-		logger:         logrus.New(),
+		roomRepository:         roomRepository,
+		chatCategoryRepository: chatCategoryRepository,
+		logger:                 logrus.New(),
 	}, nil
 }
 
@@ -106,7 +107,7 @@ func (h *HttpHandler) HandleGetAllRooms(eCtx echo.Context) error {
 	rooms, err := h.roomRepository.GetAllRooms()
 	if err != nil {
 		h.logger.Errorf("Processing of /rooms request failed! Reason: %s", err.Error())
-		_ = eCtx.JSON(http.StatusInternalServerError, makeHTTPError(GetRoomByRoomID, err.Error()))
+		_ = eCtx.JSON(http.StatusInternalServerError, makeHTTPError(GetRoomsError, err.Error()))
 		return err
 	}
 	_ = eCtx.JSON(http.StatusOK, rooms)
@@ -122,10 +123,21 @@ func (h *HttpHandler) HandleGetRoomsByCategoryID(eCtx echo.Context) error {
 	rooms, err := h.roomRepository.GetRoomsByCategoryID(categoryID)
 	if err != nil {
 		h.logger.Errorf("Processing of /rooms/byCategory/%d request failed! Reason: %s", categoryID, err.Error())
-		_ = eCtx.JSON(http.StatusInternalServerError, makeHTTPError(GetRoomByRoomID, err.Error()))
+		_ = eCtx.JSON(http.StatusInternalServerError, makeHTTPError(GetRoomsError, err.Error()))
 		return err
 	}
 	_ = eCtx.JSON(http.StatusOK, rooms)
+	return nil
+}
+
+func (h *HttpHandler) HandleGetAllCategories(eCtx echo.Context) error {
+	categories, err := h.chatCategoryRepository.GetAllCategories()
+	if err != nil {
+		h.logger.Errorf("Processing of /categories request failed! Reason: %s", err.Error())
+		_ = eCtx.JSON(http.StatusInternalServerError, makeHTTPError(GetRoomByRoomID, err.Error()))
+		return err
+	}
+	_ = eCtx.JSON(http.StatusOK, categories)
 	return nil
 }
 

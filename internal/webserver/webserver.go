@@ -33,6 +33,7 @@ func New(cfg *utils.Config, db *database.Database) (*Webserver, error) {
 	webserver.echo.GET("/rooms/:room_id", httpHandler.HandleGetRoomByRoomID)
 	webserver.echo.GET("/rooms", httpHandler.HandleGetAllRooms)
 	webserver.echo.GET("/rooms/byCategory/:category_id", httpHandler.HandleGetRoomsByCategoryID)
+	webserver.echo.GET("/categories", httpHandler.HandleGetAllCategories)
 
 	webserver.echo.HideBanner = true
 	if cfg.WebserverPort <= 0 || cfg.WebserverPort > 65535 {
