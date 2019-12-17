@@ -12,4 +12,5 @@ type Room struct {
 	TTL        int            `json:"ttl,omitempty" db:"ttl"`
 	Categories []ChatCategory `json:"categories,omitempty" db:"-"`
 	RoomID     string         `json:"roomId,omitempty" db:"room_id"`
+	EventID    string         `json:"eventId,omitempty" db:"event_id"`
 }

@@ -47,14 +47,14 @@ func NewRoomRepository(db *database.Database, chatCategoryRepository *ChatCatego
 
 func (rr *RoomRepository) PutRoom(room *models.Room) (*models.Room, error) {
 	stmt, err := rr.db.GetDatabaseConnection().Preparex(`
-		INSERT INTO rooms (latitude, longitude, ttl, room_id) 
-		VALUES ($1, $2, $3, $4) RETURNING id, created_at;
+		INSERT INTO rooms (latitude, longitude, ttl, room_id, event_id) 
+		VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at;
 	`)
 	if err != nil {
 		return nil, err
 	}
 
-	err = stmt.QueryRow(room.Latitude, room.Longitude, room.TTL, room.RoomID).Scan(&room.ID, &room.CreatedAt)
+	err = stmt.QueryRow(room.Latitude, room.Longitude, room.TTL, room.RoomID, room.EventID).Scan(&room.ID, &room.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +157,7 @@ func (rr *RoomRepository) GetAllRooms() ([]models.Room, error) {
 
 func (rr *RoomRepository) GetRoomsByCategoryID(id int) ([]models.Room, error) {
 	stmt, err := rr.db.GetDatabaseConnection().Preparex(`
-		SELECT r.id, r.latitude, r.longitude, r.ttl, r.room_id, r.created_at
+		SELECT r.id, r.latitude, r.longitude, r.ttl, r.room_id, r.created_at, r.event_id
 		FROM rooms as r
 		INNER JOIN roomsChatCategoriesLink AS rccl
 		ON rccl.categoryId = $1 AND rccl.roomId = r.id;
