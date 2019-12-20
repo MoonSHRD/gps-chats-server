@@ -47,14 +47,14 @@ func NewRoomRepository(db *database.Database, chatCategoryRepository *ChatCatego
 
 func (rr *RoomRepository) PutRoom(room *models.Room) (*models.Room, error) {
 	stmt, err := rr.db.GetDatabaseConnection().Preparex(`
-		INSERT INTO rooms (latitude, longitude, ttl, room_id, event_id) 
-		VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at;
+		INSERT INTO rooms (latitude, longitude, ttl, room_id, parent_group_id, event_start_date) 
+		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at;
 	`)
 	if err != nil {
 		return nil, err
 	}
 
-	err = stmt.QueryRow(room.Latitude, room.Longitude, room.TTL, room.RoomID, room.EventID).Scan(&room.ID, &room.CreatedAt)
+	err = stmt.QueryRow(room.Latitude, room.Longitude, room.TTL, room.RoomID, room.ParentGroupID, room.EventStartDate).Scan(&room.ID, &room.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
