@@ -130,6 +130,18 @@ func (h *HttpHandler) HandleGetRoomsByCategoryID(eCtx echo.Context) error {
 	return nil
 }
 
+func (h *HttpHandler) HandleGetRoomsByParentGroupID(eCtx echo.Context) error {
+	categoryID := eCtx.Param("parent_group_id")
+	rooms, err := h.roomRepository.GetRoomsByParentGroupID(categoryID)
+	if err != nil {
+		h.logger.Errorf("Processing of /rooms/byParentGroupId/%d request failed! Reason: %s", categoryID, err.Error())
+		_ = eCtx.JSON(http.StatusInternalServerError, makeHTTPError(GetRoomsError, err.Error()))
+		return err
+	}
+	_ = eCtx.JSON(http.StatusOK, rooms)
+	return nil
+}
+
 func (h *HttpHandler) HandleGetAllCategories(eCtx echo.Context) error {
 	categories, err := h.chatCategoryRepository.GetAllCategories()
 	if err != nil {
