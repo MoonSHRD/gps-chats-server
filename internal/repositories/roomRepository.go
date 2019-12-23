@@ -157,7 +157,7 @@ func (rr *RoomRepository) GetAllRooms() ([]models.Room, error) {
 
 func (rr *RoomRepository) GetRoomsByCategoryID(id int) ([]models.Room, error) {
 	stmt, err := rr.db.GetDatabaseConnection().Preparex(`
-		SELECT r.id, r.latitude, r.longitude, r.ttl, r.room_id, r.created_at, r.event_id
+		SELECT r.id, r.latitude, r.longitude, r.ttl, r.room_id, r.created_at, r.parent_group_id, r.event_start_date
 		FROM rooms as r
 		INNER JOIN roomsChatCategoriesLink AS rccl
 		ON rccl.categoryId = $1 AND rccl.roomId = r.id;
@@ -167,6 +167,36 @@ func (rr *RoomRepository) GetRoomsByCategoryID(id int) ([]models.Room, error) {
 	}
 	var rooms []models.Room
 	err = stmt.Select(&rooms, id)
+	if err != nil {
+		return nil, err
+	}
+
+	for i, room := range rooms {
+		categories, err := rr.getCategoriesByRoomID(room.ID)
+		if err != nil {
+			return nil, err
+		}
+		rooms[i].Categories = categories
+	}
+	if rooms == nil {
+		rooms = make([]models.Room, 0)
+	}
+	return rooms, nil
+}
+
+func (rr *RoomRepository) GetRoomsByParentGroupID(parentGroupID string) ([]models.Room, error) {
+	stmt, err := rr.db.GetDatabaseConnection().Preparex(`
+		SELECT r.id, r.latitude, r.longitude, r.ttl, r.room_id, r.created_at, r.parent_group_id, r.event_start_date
+		FROM rooms as r
+		INNER JOIN roomsChatCategoriesLink AS rccl
+		ON rccl.roomId = r.id
+		WHERE r.parent_group_id = $1;
+	`)
+	if err != nil {
+		return nil, err
+	}
+	var rooms []models.Room
+	err = stmt.Select(&rooms, parentGroupID)
 	if err != nil {
 		return nil, err
 	}
