@@ -3,9 +3,9 @@ package repositories
 import (
 	"fmt"
 
-	"github.com/MoonSHRD/sonis/internal/utils"
+	"github.com/MoonSHRD/logger"
 
-	"github.com/sirupsen/logrus"
+	"github.com/MoonSHRD/sonis/internal/utils"
 
 	"github.com/MoonSHRD/sonis/internal/database"
 	"github.com/MoonSHRD/sonis/internal/models"
@@ -27,7 +27,6 @@ const (
 
 type RoomRepository struct {
 	db                     *database.Database
-	logger                 *logrus.Logger
 	chatCategoryRepository *ChatCategoryRepository
 }
 
@@ -35,7 +34,6 @@ func NewRoomRepository(db *database.Database, chatCategoryRepository *ChatCatego
 	if db != nil {
 		roomRepo := &RoomRepository{
 			db:                     db,
-			logger:                 logrus.New(),
 			chatCategoryRepository: chatCategoryRepository,
 		}
 		roomRepo.clearExpiredRecords()
@@ -46,6 +44,9 @@ func NewRoomRepository(db *database.Database, chatCategoryRepository *ChatCatego
 }
 
 func (rr *RoomRepository) PutRoom(room *models.Room) (*models.Room, error) {
+	if room.TTL <= 0 {
+		return nil, fmt.Errorf("TTL is invalid")
+	}
 	stmt, err := rr.db.GetDatabaseConnection().Preparex(`
 		INSERT INTO rooms (latitude, longitude, ttl, room_id, parent_group_id, event_start_date) 
 		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at;
@@ -82,11 +83,11 @@ func (rr *RoomRepository) PutRoom(room *models.Room) (*models.Room, error) {
 		stmt2, _ := rr.db.GetDatabaseConnection().Preparex("DELETE FROM roomsChatCategoriesLink WHERE roomId = $1;")
 		_, err = stmt1.Exec(room.ID)
 		if err != nil {
-			rr.logger.Errorf("Cannot delete room %d. Reason: %s", room.ID, err.Error())
+			logger.Errorf("Cannot delete room %d. Reason: %s", room.ID, err.Error())
 		}
 		_, err = stmt2.Exec(room.ID)
 		if err != nil {
-			rr.logger.Errorf("Cannot delete room %d. Reason: %s", room.ID, err.Error())
+			logger.Errorf("Cannot delete room %d. Reason: %s", room.ID, err.Error())
 		}
 		stopChan <- true
 	}, seconds*1000, true)
@@ -214,6 +215,49 @@ func (rr *RoomRepository) GetRoomsByParentGroupID(parentGroupID string) ([]model
 	return rooms, nil
 }
 
+func (rr *RoomRepository) UpdateRoom(room *models.Room) (*models.Room, error) {
+	args := map[string]interface{}{
+		"id":               room.ID,
+		"latitude":         room.Latitude,
+		"longitude":        room.Longitude,
+		"room_id":          room.RoomID,
+		"parent_group_id":  room.ParentGroupID,
+		"event_start_date": room.EventStartDate,
+	}
+	_, err := rr.db.GetDatabaseConnection().NamedExec(
+		`update rooms set 
+			latitude = :latitude,
+			longitude = :longitude,
+			room_id = :room_id, 
+			parent_group_id = :parent_group_id,
+			event_start_date = :event_start_date
+		where id = :id
+	`, args)
+	if err != nil {
+		return nil, err
+	}
+	stmt, err := rr.db.GetDatabaseConnection().Preparex("delete from roomschatcategorieslink where roomid = $1")
+	if err != nil {
+		return nil, err
+	}
+	_, err = stmt.Exec(room.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, v := range room.Categories {
+		stmt, err := rr.db.GetDatabaseConnection().Preparex("insert into roomsChatCategoriesLink (categoryId, roomId) values ($1, $2);")
+		if err != nil {
+			return nil, err
+		}
+		_, err = stmt.Exec(v.Id, room.ID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return room, nil
+}
+
 func (rr *RoomRepository) getCategoriesByRoomID(id int) ([]models.ChatCategory, error) {
 	stmt, err := rr.db.GetDatabaseConnection().Preparex(`
 			SELECT cc.id, cc.categoryname
@@ -248,14 +292,14 @@ func (rr *RoomRepository) clearExpiredRecords() {
 		WHERE rccl.roomID = x.id;
 	`)
 	if err != nil {
-		rr.logger.Errorf("Failed to clear expired records in database! %s", err.Error())
+		logger.Errorf("Failed to clear expired records in database! %s", err.Error())
 	}
 	rowsAffected, err := res.RowsAffected()
 	if err != nil {
-		rr.logger.Errorf("Failed to clear expired records in database! %s", err.Error())
+		logger.Errorf("Failed to clear expired records in database! %s", err.Error())
 	}
 	if rowsAffected > 0 {
-		rr.logger.Infof("Cleaned up database from %d expired records", rowsAffected)
+		logger.Infof("Cleaned up database from %d expired records", rowsAffected)
 	}
 }
 

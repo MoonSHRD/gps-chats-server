@@ -7,6 +7,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	DefaultWebserverPort = 23419
+)
+
 type Context struct {
 	DB        *database.Database
 	Webserver *webserver.Webserver
@@ -19,6 +23,9 @@ func New(cfg utils.Config) (*Context, error) {
 	if err != nil {
 		logger.Error("Failed to initialize database. Reason: " + err.Error())
 		return nil, err
+	}
+	if !utils.IsWebserverPortValid(&cfg) {
+		cfg.WebserverPort = DefaultWebserverPort
 	}
 	ws, err := webserver.New(&cfg, db)
 	if err != nil {

@@ -8,3 +8,10 @@ type Config struct {
 	DatabasePort     int    `yaml:"databasePort"`
 	WebserverPort    int    `yaml:"webserverPort"`
 }
+
+func IsWebserverPortValid(cfg *Config) bool {
+	if cfg.WebserverPort <= 0 || cfg.WebserverPort > 65535 {
+		return false
+	}
+	return true
+}
