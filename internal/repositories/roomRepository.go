@@ -44,6 +44,9 @@ func NewRoomRepository(db *database.Database, chatCategoryRepository *ChatCatego
 }
 
 func (rr *RoomRepository) PutRoom(room *models.Room) (*models.Room, error) {
+	if room.TTL <= 0 {
+		return nil, fmt.Errorf("TTL is invalid")
+	}
 	stmt, err := rr.db.GetDatabaseConnection().Preparex(`
 		INSERT INTO rooms (latitude, longitude, ttl, room_id, parent_group_id, event_start_date) 
 		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at;
