@@ -2,7 +2,7 @@ package utils
 
 import "time"
 
-func SetInterval(someFunc func(), milliseconds int, async bool) chan bool {
+func SetInterval(someFunc func(...interface{}), milliseconds int, async bool, args ...interface{}) chan bool {
 
 	// How often to fire the passed in function
 	// in milliseconds
@@ -13,6 +13,28 @@ func SetInterval(someFunc func(), milliseconds int, async bool) chan bool {
 	ticker := time.NewTicker(interval)
 	clear := make(chan bool)
 
+	callFuncionWithArgs := func() {
+		switch len(args) {
+		case 0:
+			{
+				someFunc()
+			}
+		case 1:
+			{
+				someFunc(args[0])
+			}
+		case 2:
+			{
+				someFunc(args[0], args[1])
+			}
+		case 3:
+			{
+				someFunc(args[0], args[1], args[3])
+			}
+			// add more cases if you need this
+		}
+	}
+
 	// Put the selection in a go routine
 	// so that the for loop is none blocking
 	go func() {
@@ -22,10 +44,10 @@ func SetInterval(someFunc func(), milliseconds int, async bool) chan bool {
 			case <-ticker.C:
 				if async {
 					// This won't block
-					go someFunc()
+					go callFuncionWithArgs()
 				} else {
 					// This will block
-					someFunc()
+					callFuncionWithArgs()
 				}
 			case <-clear:
 				ticker.Stop()
