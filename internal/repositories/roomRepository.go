@@ -3,15 +3,18 @@ package repositories
 import (
 	"fmt"
 
-	"github.com/MoonSHRD/sonis/internal/utils"
+	"github.com/MoonSHRD/logger"
 
-	"github.com/sirupsen/logrus"
+	"github.com/MoonSHRD/sonis/internal/utils"
 
 	"github.com/MoonSHRD/sonis/internal/database"
 	"github.com/MoonSHRD/sonis/internal/models"
 )
 
 const (
+	// SecondMillisecs represents one second in milliseconds
+	SecondMillisecs = 1000
+
 	// Minute represents one minute in seconds
 	Minute = 60
 
@@ -27,7 +30,6 @@ const (
 
 type RoomRepository struct {
 	db                     *database.Database
-	logger                 *logrus.Logger
 	chatCategoryRepository *ChatCategoryRepository
 }
 
@@ -35,17 +37,21 @@ func NewRoomRepository(db *database.Database, chatCategoryRepository *ChatCatego
 	if db != nil {
 		roomRepo := &RoomRepository{
 			db:                     db,
-			logger:                 logrus.New(),
 			chatCategoryRepository: chatCategoryRepository,
 		}
 		roomRepo.clearExpiredRecords()
-		executeEveryMinutes(roomRepo.clearExpiredRecords, 5)
+		utils.SetInterval(func(args ...interface{}) {
+			roomRepo.clearExpiredRecords()
+		}, SecondMillisecs*30, true)
 		return roomRepo, nil
 	}
 	return nil, fmt.Errorf("database connection is null")
 }
 
 func (rr *RoomRepository) PutRoom(room *models.Room) (*models.Room, error) {
+	if room.TTL <= 0 {
+		return nil, fmt.Errorf("TTL is invalid")
+	}
 	stmt, err := rr.db.GetDatabaseConnection().Preparex(`
 		INSERT INTO rooms (latitude, longitude, ttl, room_id, parent_group_id, event_start_date) 
 		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at;
@@ -75,21 +81,6 @@ func (rr *RoomRepository) PutRoom(room *models.Room) (*models.Room, error) {
 	if seconds > Month {
 		return nil, fmt.Errorf("creating chats for more than one month is prohibited")
 	}
-
-	var stopChan chan bool
-	stopChan = utils.SetInterval(func() {
-		stmt1, _ := rr.db.GetDatabaseConnection().Preparex("DELETE FROM rooms WHERE id = $1;")
-		stmt2, _ := rr.db.GetDatabaseConnection().Preparex("DELETE FROM roomsChatCategoriesLink WHERE roomId = $1;")
-		_, err = stmt1.Exec(room.ID)
-		if err != nil {
-			rr.logger.Errorf("Cannot delete room %d. Reason: %s", room.ID, err.Error())
-		}
-		_, err = stmt2.Exec(room.ID)
-		if err != nil {
-			rr.logger.Errorf("Cannot delete room %d. Reason: %s", room.ID, err.Error())
-		}
-		stopChan <- true
-	}, seconds*1000, true)
 	return room, nil
 }
 
@@ -119,12 +110,25 @@ func (rr *RoomRepository) GetRoomsByCoords(userLat float64, userLon float64, rad
 }
 
 func (rr *RoomRepository) GetRoomByRoomID(roomID string) (*models.Room, error) {
-	stmt, err := rr.db.GetDatabaseConnection().Preparex("SELECT * FROM rooms WHERE room_id = ?")
+	stmt, err := rr.db.GetDatabaseConnection().Preparex("SELECT * FROM rooms WHERE room_id = $1")
 	if err != nil {
 		return nil, err
 	}
 	var room models.Room
 	err = stmt.Get(&room, roomID)
+	if err != nil {
+		return nil, err
+	}
+	return &room, nil
+}
+
+func (rr *RoomRepository) GetRoomByID(id int) (*models.Room, error) {
+	stmt, err := rr.db.GetDatabaseConnection().Preparex("SELECT * FROM rooms WHERE id = $1")
+	if err != nil {
+		return nil, err
+	}
+	var room models.Room
+	err = stmt.Get(&room, id)
 	if err != nil {
 		return nil, err
 	}
@@ -214,6 +218,58 @@ func (rr *RoomRepository) GetRoomsByParentGroupID(parentGroupID string) ([]model
 	return rooms, nil
 }
 
+func (rr *RoomRepository) UpdateRoom(room *models.Room) (*models.Room, error) {
+	if room.TTL <= 0 {
+		return nil, fmt.Errorf("TTL is invalid")
+	}
+	if room.TTL > Month {
+		return nil, fmt.Errorf("creating chats for more than one month is prohibited")
+	}
+	args := map[string]interface{}{
+		"id":               room.ID,
+		"latitude":         room.Latitude,
+		"longitude":        room.Longitude,
+		"ttl":              room.TTL,
+		"room_id":          room.RoomID,
+		"parent_group_id":  room.ParentGroupID,
+		"event_start_date": room.EventStartDate,
+	}
+	_, err := rr.db.GetDatabaseConnection().NamedExec(
+		`update rooms set 
+			latitude = :latitude,
+			longitude = :longitude,
+			ttl = :ttl,
+			room_id = :room_id, 
+			parent_group_id = :parent_group_id,
+			event_start_date = :event_start_date
+		where id = :id
+	`, args)
+	if err != nil {
+		return nil, err
+	}
+	stmt, err := rr.db.GetDatabaseConnection().Preparex("delete from roomschatcategorieslink where roomid = $1")
+	if err != nil {
+		return nil, err
+	}
+	_, err = stmt.Exec(room.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, v := range room.Categories {
+		stmt, err := rr.db.GetDatabaseConnection().Preparex("insert into roomsChatCategoriesLink (categoryId, roomId) values ($1, $2);")
+		if err != nil {
+			return nil, err
+		}
+		_, err = stmt.Exec(v.Id, room.ID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return room, nil
+}
+
 func (rr *RoomRepository) getCategoriesByRoomID(id int) ([]models.ChatCategory, error) {
 	stmt, err := rr.db.GetDatabaseConnection().Preparex(`
 			SELECT cc.id, cc.categoryname
@@ -248,20 +304,13 @@ func (rr *RoomRepository) clearExpiredRecords() {
 		WHERE rccl.roomID = x.id;
 	`)
 	if err != nil {
-		rr.logger.Errorf("Failed to clear expired records in database! %s", err.Error())
+		logger.Errorf("Failed to clear expired records in database! %s", err.Error())
 	}
 	rowsAffected, err := res.RowsAffected()
 	if err != nil {
-		rr.logger.Errorf("Failed to clear expired records in database! %s", err.Error())
+		logger.Errorf("Failed to clear expired records in database! %s", err.Error())
 	}
 	if rowsAffected > 0 {
-		rr.logger.Infof("Cleaned up database from %d expired records", rowsAffected)
+		logger.Infof("Cleaned up database from %d expired records", rowsAffected)
 	}
-}
-
-// executeEveryMinutes executes given function every N minutes
-// FIXME Should be not as crunch
-func executeEveryMinutes(fn func(), minutePeriod int) {
-	millisecs := 60000 * minutePeriod
-	utils.SetInterval(fn, millisecs, true)
 }

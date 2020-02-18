@@ -7,29 +7,31 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/MoonSHRD/logger"
+
 	internalCtx "github.com/MoonSHRD/sonis/internal/context"
 	"github.com/MoonSHRD/sonis/internal/utils"
 	"gopkg.in/yaml.v2"
-
-	"github.com/sirupsen/logrus"
 )
 
-var logger = logrus.New()
 var context *internalCtx.Context
 
 func main() {
 	var err error
+	var cfg utils.Config
+	var configPath = flag.String("config", "", "Path to config")
+	var verbose = flag.Bool("verbose", true, "Verbose logging")
+	var syslog = flag.Bool("syslog", false, "Clone log to system logging daemon")
+	flag.Parse()
+
+	defer logger.Init("sonis", *verbose, *syslog, ioutil.Discard).Close() // TODO make ability to use file for log output
 	logger.Info("Starting microservice...")
 
-	var cfg utils.Config
-	var configPath string
-	flag.StringVar(&configPath, "config", "", "Path to config")
-	flag.Parse()
-	if configPath == "" {
+	if *configPath == "" {
 		logger.Error("Path to config isn't specified!")
 		os.Exit(1)
 	}
-	cfgData, err := ioutil.ReadFile(configPath)
+	cfgData, err := ioutil.ReadFile(*configPath)
 	if err != nil {
 		logger.Error("Failed to read config!")
 		os.Exit(1)
