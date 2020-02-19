@@ -91,11 +91,14 @@ func (h *HttpHandler) HandleGetRoomsRequest(eCtx echo.Context) error {
 	return nil
 }
 
-func (h *HttpHandler) HandleGetRoomByRoomID(eCtx echo.Context) error {
-	roomID := eCtx.Param("room_id")
-	room, err := h.roomRepository.GetRoomByRoomID(roomID)
+func (h *HttpHandler) HandleGetRoomByID(eCtx echo.Context) error {
+	id, err := strconv.Atoi(eCtx.Param("id"))
 	if err != nil {
-		logger.Errorf("Processing of /rooms/%s request failed! Reason: %s", roomID, err.Error())
+		return err
+	}
+	room, err := h.roomRepository.GetRoomByID(id)
+	if err != nil {
+		logger.Errorf("Processing of /rooms/%s request failed! Reason: %s", id, err.Error())
 		eCtx.JSON(http.StatusInternalServerError, makeHTTPError(GetRoomByRoomID, err.Error()))
 		return err
 	}
