@@ -132,6 +132,11 @@ func (rr *RoomRepository) GetRoomByID(id int) (*models.Room, error) {
 	if err != nil {
 		return nil, err
 	}
+	categories, err := rr.getCategoriesByRoomID(room.ID)
+	if err != nil {
+		return nil, err
+	}
+	room.Categories = categories
 	return &room, nil
 }
 
