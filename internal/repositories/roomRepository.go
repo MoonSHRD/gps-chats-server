@@ -53,14 +53,14 @@ func (rr *RoomRepository) PutRoom(room *models.Room) (*models.Room, error) {
 		return nil, fmt.Errorf("TTL is invalid")
 	}
 	stmt, err := rr.db.GetDatabaseConnection().Preparex(`
-		INSERT INTO rooms (latitude, longitude, ttl, room_id, parent_group_id, event_start_date) 
-		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at;
+		INSERT INTO rooms (latitude, longitude, ttl, room_id, parent_group_id, event_start_date, name) 
+		VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, created_at;
 	`)
 	if err != nil {
 		return nil, err
 	}
 
-	err = stmt.QueryRow(room.Latitude, room.Longitude, room.TTL, room.RoomID, room.ParentGroupID, room.EventStartDate).Scan(&room.ID, &room.CreatedAt)
+	err = stmt.QueryRow(room.Latitude, room.Longitude, room.TTL, room.RoomID, room.ParentGroupID, room.EventStartDate, room.Name).Scan(&room.ID, &room.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +166,7 @@ func (rr *RoomRepository) GetAllRooms() ([]models.Room, error) {
 
 func (rr *RoomRepository) GetRoomsByCategoryID(id int) ([]models.Room, error) {
 	stmt, err := rr.db.GetDatabaseConnection().Preparex(`
-		SELECT r.id, r.latitude, r.longitude, r.ttl, r.room_id, r.created_at, r.parent_group_id, r.event_start_date
+		SELECT r.id, r.latitude, r.longitude, r.ttl, r.room_id, r.created_at, r.parent_group_id, r.event_start_date, r.name
 		FROM rooms as r
 		INNER JOIN roomsChatCategoriesLink AS rccl
 		ON rccl.categoryId = $1 AND rccl.roomId = r.id;
@@ -195,7 +195,7 @@ func (rr *RoomRepository) GetRoomsByCategoryID(id int) ([]models.Room, error) {
 
 func (rr *RoomRepository) GetRoomsByParentGroupID(parentGroupID string) ([]models.Room, error) {
 	stmt, err := rr.db.GetDatabaseConnection().Preparex(`
-		SELECT r.id, r.latitude, r.longitude, r.ttl, r.room_id, r.created_at, r.parent_group_id, r.event_start_date
+		SELECT r.id, r.latitude, r.longitude, r.ttl, r.room_id, r.created_at, r.parent_group_id, r.event_start_date, r.name
 		FROM rooms as r
 		INNER JOIN roomsChatCategoriesLink AS rccl
 		ON rccl.roomId = r.id
@@ -238,6 +238,7 @@ func (rr *RoomRepository) UpdateRoom(room *models.Room) (*models.Room, error) {
 		"room_id":          room.RoomID,
 		"parent_group_id":  room.ParentGroupID,
 		"event_start_date": room.EventStartDate,
+		"name":             room.Name,
 	}
 	_, err := rr.db.GetDatabaseConnection().NamedExec(
 		`update rooms set 
@@ -246,7 +247,8 @@ func (rr *RoomRepository) UpdateRoom(room *models.Room) (*models.Room, error) {
 			ttl = :ttl,
 			room_id = :room_id, 
 			parent_group_id = :parent_group_id,
-			event_start_date = :event_start_date
+			event_start_date = :event_start_date,
+			name = :name
 		where id = :id
 	`, args)
 	if err != nil {
