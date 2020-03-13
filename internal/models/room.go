@@ -11,4 +11,5 @@ type Room struct {
 	ParentGroupID  string         `json:"parentGroupId,omitempty" db:"parent_group_id"`
 	EventStartDate NullableTime   `json:"eventStartDate,omitempty" db:"event_start_date"`
 	Name           string         `json:"name" db:"name"`
+	Address        string         `json:"address" db:"address"`
 }
