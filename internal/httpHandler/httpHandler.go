@@ -13,10 +13,11 @@ import (
 )
 
 const (
-	PutRoomError    = 1
-	GetRoomsError   = 2
-	GetRoomByRoomID = 3
-	UpdateRoomError = 4
+	PutRoomError = iota
+	GetRoomsError
+	GetRoomByRoomID
+	UpdateRoomError
+	DeleteRoomError
 )
 
 type HttpHandler struct {
@@ -172,6 +173,23 @@ func (h *HttpHandler) HandleUpdateRoomRequest(eCtx echo.Context) error {
 	}
 	eCtx.JSON(http.StatusOK, room)
 	return nil
+}
+
+func (h *HttpHandler) HandleDeleteRoomRequest(eCtx echo.Context) error {
+	roomIDStr := eCtx.Param("id")
+	roomID, err := strconv.Atoi(roomIDStr)
+	if err != nil {
+		logger.Errorf(err.Error())
+		eCtx.JSON(http.StatusBadRequest, makeHTTPError(DeleteRoomError, err.Error()))
+		return err
+	}
+	err = h.roomRepository.DeleteRoom(roomID)
+	if err != nil {
+		logger.Errorf(err.Error())
+		eCtx.JSON(http.StatusInternalServerError, makeHTTPError(DeleteRoomError, err.Error()))
+		return err
+	}
+	return eCtx.String(http.StatusOK, "")
 }
 
 func makeHTTPError(errCode int, errText string) *models.HTTPError {

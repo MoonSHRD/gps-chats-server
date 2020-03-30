@@ -279,6 +279,28 @@ func (rr *RoomRepository) UpdateRoom(room *models.Room) (*models.Room, error) {
 	return room, nil
 }
 
+func (rr *RoomRepository) DeleteRoom(id int) error {
+	stmt, err := rr.db.GetDatabaseConnection().Preparex("delete from roomschatcategorieslink where roomid = $1")
+	if err != nil {
+		return err
+	}
+
+	_, err = stmt.Exec(id)
+	if err != nil {
+		return err
+	}
+
+	args := map[string]interface{}{
+		"id": id,
+	}
+	_, err = rr.db.GetDatabaseConnection().NamedExec(
+		`delete from rooms where id = :id`, args)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (rr *RoomRepository) getCategoriesByRoomID(id int) ([]models.ChatCategory, error) {
 	stmt, err := rr.db.GetDatabaseConnection().Preparex(`
 			SELECT cc.id, cc.categoryname
