@@ -36,6 +36,7 @@ func New(cfg *utils.Config, db *database.Database) (*Webserver, error) {
 	webserver.echo.GET("/categories", httpHandler.HandleGetAllCategories)
 	webserver.echo.GET("/rooms/byParentGroupId/:parent_group_id", httpHandler.HandleGetRoomsByParentGroupID)
 	webserver.echo.PUT("/rooms/update", httpHandler.HandleUpdateRoomRequest)
+	webserver.echo.DELETE("/rooms/:id", httpHandler.HandleDeleteRoomRequest)
 
 	webserver.echo.HideBanner = true
 	go func() {
