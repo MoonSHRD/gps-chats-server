@@ -3,7 +3,6 @@ package utils
 import "time"
 
 func SetInterval(someFunc func(...interface{}), milliseconds int, async bool, args ...interface{}) chan bool {
-
 	// How often to fire the passed in function
 	// in milliseconds
 	interval := time.Duration(milliseconds) * time.Millisecond
@@ -60,5 +59,4 @@ func SetInterval(someFunc func(...interface{}), milliseconds int, async bool, ar
 	// We return the channel so we can pass in
 	// a value to it to clear the interval
 	return clear
-
 }

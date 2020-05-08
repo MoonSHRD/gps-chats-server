@@ -1,27 +1,22 @@
 package repositories
 
 import (
-	"fmt"
-	"github.com/MoonSHRD/sonis/internal/database"
-	"github.com/MoonSHRD/sonis/internal/models"
+	"github.com/MoonSHRD/sonis/app"
+	"github.com/MoonSHRD/sonis/models"
 )
 
 type ChatCategoryRepository struct {
-	db *database.Database
+	app *app.App
 }
 
-func NewChatCategoryRepository(db *database.Database) (*ChatCategoryRepository, error) {
-	if db != nil {
-		chatCategoryRepository := &ChatCategoryRepository{
-			db: db,
-		}
-		return chatCategoryRepository, nil
+func NewChatCategoryRepository(a *app.App) *ChatCategoryRepository {
+	return &ChatCategoryRepository{
+		app: a,
 	}
-	return nil, fmt.Errorf("database connection is null")
 }
 
 func (ccr *ChatCategoryRepository) AddCategory(category *models.ChatCategory) (*models.ChatCategory, error) {
-	stmt, err := ccr.db.GetDatabaseConnection().Preparex("INSERT INTO chatCategories (categoryName) VALUES ($1) RETURNING id;")
+	stmt, err := ccr.app.DBConn.Preparex("INSERT INTO chatCategories (categoryName) VALUES ($1) RETURNING id;")
 	if err != nil {
 		return nil, err
 	}
@@ -35,7 +30,7 @@ func (ccr *ChatCategoryRepository) AddCategory(category *models.ChatCategory) (*
 }
 
 func (ccr *ChatCategoryRepository) GetCategory(id int) (*models.ChatCategory, error) {
-	stmt, err := ccr.db.GetDatabaseConnection().Preparex("SELECT * FROM chatCategories WHERE id = ?;")
+	stmt, err := ccr.app.DBConn.Preparex("SELECT * FROM chatCategories WHERE id = ?;")
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +43,7 @@ func (ccr *ChatCategoryRepository) GetCategory(id int) (*models.ChatCategory, er
 }
 
 func (ccr *ChatCategoryRepository) GetAllCategories() ([]models.ChatCategory, error) {
-	stmt, err := ccr.db.GetDatabaseConnection().Preparex("SELECT * FROM chatCategories;")
+	stmt, err := ccr.app.DBConn.Preparex("SELECT * FROM chatCategories;")
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +56,7 @@ func (ccr *ChatCategoryRepository) GetAllCategories() ([]models.ChatCategory, er
 }
 
 func (ccr *ChatCategoryRepository) RemoveCategory(id int) error {
-	stmt, err := ccr.db.GetDatabaseConnection().Preparex("DELETE FROM chatCategories WHERE id = ?;")
+	stmt, err := ccr.app.DBConn.Preparex("DELETE FROM chatCategories WHERE id = ?;")
 	if err != nil {
 		return err
 	}
@@ -73,7 +68,7 @@ func (ccr *ChatCategoryRepository) RemoveCategory(id int) error {
 }
 
 func (ccr *ChatCategoryRepository) UpdateCategoryName(updatedCategory *models.ChatCategory) error {
-	stmt, err := ccr.db.GetDatabaseConnection().Preparex("UPDATE chatCategories SET categoryName = $1 WHERE id = $2;")
+	stmt, err := ccr.app.DBConn.Preparex("UPDATE chatCategories SET categoryName = $1 WHERE id = $2;")
 	if err != nil {
 		return err
 	}

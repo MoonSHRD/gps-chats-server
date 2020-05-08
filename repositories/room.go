@@ -5,10 +5,10 @@ import (
 
 	"github.com/MoonSHRD/logger"
 
-	"github.com/MoonSHRD/sonis/internal/utils"
+	"github.com/MoonSHRD/sonis/app"
+	"github.com/MoonSHRD/sonis/utils"
 
-	"github.com/MoonSHRD/sonis/internal/database"
-	"github.com/MoonSHRD/sonis/internal/models"
+	"github.com/MoonSHRD/sonis/models"
 )
 
 const (
@@ -29,30 +29,27 @@ const (
 )
 
 type RoomRepository struct {
-	db                     *database.Database
+	app                    *app.App
 	chatCategoryRepository *ChatCategoryRepository
 }
 
-func NewRoomRepository(db *database.Database, chatCategoryRepository *ChatCategoryRepository) (*RoomRepository, error) {
-	if db != nil {
-		roomRepo := &RoomRepository{
-			db:                     db,
-			chatCategoryRepository: chatCategoryRepository,
-		}
-		roomRepo.clearExpiredRecords()
-		utils.SetInterval(func(args ...interface{}) {
-			roomRepo.clearExpiredRecords()
-		}, SecondMillisecs*30, true)
-		return roomRepo, nil
+func NewRoomRepository(a *app.App, chatCategoryRepository *ChatCategoryRepository) *RoomRepository {
+	roomRepo := &RoomRepository{
+		app:                    a,
+		chatCategoryRepository: chatCategoryRepository,
 	}
-	return nil, fmt.Errorf("database connection is null")
+	roomRepo.clearExpiredRecords()
+	utils.SetInterval(func(args ...interface{}) {
+		roomRepo.clearExpiredRecords()
+	}, SecondMillisecs*30, true)
+	return roomRepo
 }
 
 func (rr *RoomRepository) PutRoom(room *models.Room) (*models.Room, error) {
 	if room.TTL <= 0 {
 		return nil, fmt.Errorf("TTL is invalid")
 	}
-	stmt, err := rr.db.GetDatabaseConnection().Preparex(`
+	stmt, err := rr.app.DBConn.Preparex(`
 		INSERT INTO rooms (latitude, longitude, ttl, room_id, parent_group_id, event_start_date, name, address) 
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, created_at;
 	`)
@@ -66,7 +63,7 @@ func (rr *RoomRepository) PutRoom(room *models.Room) (*models.Room, error) {
 	}
 
 	for _, x := range room.Categories {
-		stmt, err := rr.db.GetDatabaseConnection().Preparex("INSERT INTO roomsChatCategoriesLink (categoryId, roomId) VALUES ($1, $2);")
+		stmt, err := rr.app.DBConn.Preparex("INSERT INTO roomsChatCategoriesLink (categoryId, roomId) VALUES ($1, $2);")
 		if err != nil {
 			return nil, err
 		}
@@ -86,7 +83,7 @@ func (rr *RoomRepository) PutRoom(room *models.Room) (*models.Room, error) {
 
 func (rr *RoomRepository) GetRoomsByCoords(userLat float64, userLon float64, radius int) (*[]models.Room, error) {
 	var rooms []models.Room
-	stmt, err := rr.db.GetDatabaseConnection().Preparex("SELECT * FROM rooms WHERE SQRT(POWER(latitude-$1, 2) + POWER(longitude-$2, 2)) < $3;")
+	stmt, err := rr.app.DBConn.Preparex("SELECT * FROM rooms WHERE SQRT(POWER(latitude-$1, 2) + POWER(longitude-$2, 2)) < $3;")
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +107,7 @@ func (rr *RoomRepository) GetRoomsByCoords(userLat float64, userLon float64, rad
 }
 
 func (rr *RoomRepository) GetRoomByRoomID(roomID string) (*models.Room, error) {
-	stmt, err := rr.db.GetDatabaseConnection().Preparex("SELECT * FROM rooms WHERE room_id = $1")
+	stmt, err := rr.app.DBConn.Preparex("SELECT * FROM rooms WHERE room_id = $1")
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +120,7 @@ func (rr *RoomRepository) GetRoomByRoomID(roomID string) (*models.Room, error) {
 }
 
 func (rr *RoomRepository) GetRoomByID(id int) (*models.Room, error) {
-	stmt, err := rr.db.GetDatabaseConnection().Preparex("SELECT * FROM rooms WHERE id = $1")
+	stmt, err := rr.app.DBConn.Preparex("SELECT * FROM rooms WHERE id = $1")
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +138,7 @@ func (rr *RoomRepository) GetRoomByID(id int) (*models.Room, error) {
 }
 
 func (rr *RoomRepository) GetAllRooms() ([]models.Room, error) {
-	stmt, err := rr.db.GetDatabaseConnection().Preparex("SELECT * FROM rooms;")
+	stmt, err := rr.app.DBConn.Preparex("SELECT * FROM rooms;")
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +162,7 @@ func (rr *RoomRepository) GetAllRooms() ([]models.Room, error) {
 }
 
 func (rr *RoomRepository) GetRoomsByCategoryID(id int) ([]models.Room, error) {
-	stmt, err := rr.db.GetDatabaseConnection().Preparex(`
+	stmt, err := rr.app.DBConn.Preparex(`
 		SELECT r.id, r.latitude, r.longitude, r.ttl, r.room_id, r.created_at, r.parent_group_id, r.event_start_date, r.name, r.address
 		FROM rooms as r
 		INNER JOIN roomsChatCategoriesLink AS rccl
@@ -194,7 +191,7 @@ func (rr *RoomRepository) GetRoomsByCategoryID(id int) ([]models.Room, error) {
 }
 
 func (rr *RoomRepository) GetRoomsByParentGroupID(parentGroupID string) ([]models.Room, error) {
-	stmt, err := rr.db.GetDatabaseConnection().Preparex(`
+	stmt, err := rr.app.DBConn.Preparex(`
 		SELECT r.id, r.latitude, r.longitude, r.ttl, r.room_id, r.created_at, r.parent_group_id, r.event_start_date, r.name, r.address
 		FROM rooms as r
 		INNER JOIN roomsChatCategoriesLink AS rccl
@@ -241,7 +238,7 @@ func (rr *RoomRepository) UpdateRoom(room *models.Room) (*models.Room, error) {
 		"name":             room.Name,
 		"address":          room.Address,
 	}
-	_, err := rr.db.GetDatabaseConnection().NamedExec(
+	_, err := rr.app.DBConn.NamedExec(
 		`update rooms set 
 			latitude = :latitude,
 			longitude = :longitude,
@@ -256,7 +253,7 @@ func (rr *RoomRepository) UpdateRoom(room *models.Room) (*models.Room, error) {
 	if err != nil {
 		return nil, err
 	}
-	stmt, err := rr.db.GetDatabaseConnection().Preparex("delete from roomschatcategorieslink where roomid = $1")
+	stmt, err := rr.app.DBConn.Preparex("delete from roomschatcategorieslink where roomid = $1")
 	if err != nil {
 		return nil, err
 	}
@@ -266,7 +263,7 @@ func (rr *RoomRepository) UpdateRoom(room *models.Room) (*models.Room, error) {
 	}
 
 	for _, v := range room.Categories {
-		stmt, err := rr.db.GetDatabaseConnection().Preparex("insert into roomsChatCategoriesLink (categoryId, roomId) values ($1, $2);")
+		stmt, err := rr.app.DBConn.Preparex("insert into roomsChatCategoriesLink (categoryId, roomId) values ($1, $2);")
 		if err != nil {
 			return nil, err
 		}
@@ -280,7 +277,7 @@ func (rr *RoomRepository) UpdateRoom(room *models.Room) (*models.Room, error) {
 }
 
 func (rr *RoomRepository) DeleteRoom(id int) error {
-	stmt, err := rr.db.GetDatabaseConnection().Preparex("delete from roomschatcategorieslink where roomid = $1")
+	stmt, err := rr.app.DBConn.Preparex("delete from roomschatcategorieslink where roomid = $1")
 	if err != nil {
 		return err
 	}
@@ -293,7 +290,7 @@ func (rr *RoomRepository) DeleteRoom(id int) error {
 	args := map[string]interface{}{
 		"id": id,
 	}
-	_, err = rr.db.GetDatabaseConnection().NamedExec(
+	_, err = rr.app.DBConn.NamedExec(
 		`delete from rooms where id = :id`, args)
 	if err != nil {
 		return err
@@ -302,7 +299,7 @@ func (rr *RoomRepository) DeleteRoom(id int) error {
 }
 
 func (rr *RoomRepository) getCategoriesByRoomID(id int) ([]models.ChatCategory, error) {
-	stmt, err := rr.db.GetDatabaseConnection().Preparex(`
+	stmt, err := rr.app.DBConn.Preparex(`
 			SELECT cc.id, cc.categoryname
 			FROM chatCategories AS cc
          	INNER JOIN roomsChatCategoriesLink AS rccl
@@ -323,7 +320,7 @@ func (rr *RoomRepository) getCategoriesByRoomID(id int) ([]models.ChatCategory, 
 }
 
 func (rr *RoomRepository) clearExpiredRecords() {
-	res, err := rr.db.GetDatabaseConnection().Exec(`
+	res, err := rr.app.DBConn.Exec(`
 		WITH x AS (
 			DELETE
 			FROM rooms
