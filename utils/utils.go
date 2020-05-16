@@ -1,6 +1,10 @@
 package utils
 
-import "time"
+import (
+	"time"
+
+	"github.com/dgrijalva/jwt-go"
+)
 
 func SetInterval(someFunc func(...interface{}), milliseconds int, async bool, args ...interface{}) chan bool {
 	// How often to fire the passed in function
@@ -59,4 +63,11 @@ func SetInterval(someFunc func(...interface{}), milliseconds int, async bool, ar
 	// We return the channel so we can pass in
 	// a value to it to clear the interval
 	return clear
+}
+
+type JWTCustomClaims struct {
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	UserUUID string `json:"userUUID"`
+	jwt.StandardClaims
 }

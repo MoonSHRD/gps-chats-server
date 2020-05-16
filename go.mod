@@ -16,4 +16,5 @@ require (
 	golang.org/x/sys v0.0.0-20190922100055-0a153f010e69 // indirect
 	google.golang.org/appengine v1.6.5 // indirect
 	gopkg.in/gorp.v1 v1.7.2 // indirect
+	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 )

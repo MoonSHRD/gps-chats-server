@@ -1,15 +1,19 @@
 package config
 
 import (
+	"fmt"
 	"os"
+	"regexp"
 
 	"github.com/MoonSHRD/logger"
 	"github.com/pelletier/go-toml"
 )
 
 type Config struct {
-	PostgreSQL PostgreSQL `toml:"postgresql"`
-	HTTP       HTTP       `toml:"http"`
+	PostgreSQL    PostgreSQL `toml:"postgresql"`
+	HTTP          HTTP       `toml:"http"`
+	AuthServerURL string     `toml:"authServerURL"`
+	JWT           JWT        `toml:"jwt"`
 }
 
 type PostgreSQL struct {
@@ -25,6 +29,10 @@ type HTTP struct {
 	Port    int    `toml:"port"`
 }
 
+type JWT struct {
+	SigningKey string `toml:"signingKey"`
+}
+
 func NewConfig(path string) (Config, error) {
 	file, err := os.Open(path)
 	defer file.Close()
@@ -37,6 +45,17 @@ func NewConfig(path string) (Config, error) {
 	if err != nil {
 		logger.Fatal(err)
 	}
+	err = validateConfig(&cfg)
+	return cfg, err
+}
 
-	return cfg, nil
+func validateConfig(config *Config) error {
+	matches, err := regexp.MatchString("http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+", config.AuthServerURL)
+	if err != nil {
+		return err
+	}
+	if !matches {
+		return fmt.Errorf("invalid auth server url")
+	}
+	return nil
 }
