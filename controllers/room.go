@@ -73,10 +73,7 @@ func (rc *RoomController) GetRoomsByCoords(eCtx echo.Context) error {
 }
 
 func (rc *RoomController) GetRoomByID(eCtx echo.Context) error {
-	id, err := strconv.Atoi(eCtx.Param("id"))
-	if err != nil {
-		return err
-	}
+	id := eCtx.Param("id")
 	room, err := rc.roomService.GetRoomByID(id)
 	if err != nil {
 		logger.Errorf(err.Error())
@@ -126,17 +123,6 @@ func (rc *RoomController) GetRoomsByParentGroupID(eCtx echo.Context) error {
 	return nil
 }
 
-func (rc *RoomController) GetAllCategories(eCtx echo.Context) error {
-	categories, err := rc.roomService.GetAllCategories()
-	if err != nil {
-		logger.Errorf(err.Error())
-		ReturnHTTPError(eCtx, err, http.StatusInternalServerError)
-		return err
-	}
-	_ = eCtx.JSON(http.StatusOK, categories)
-	return nil
-}
-
 func (rc *RoomController) UpdateRoom(eCtx echo.Context) error {
 	var room *models.Room
 	err := eCtx.Bind(&room)
@@ -156,14 +142,8 @@ func (rc *RoomController) UpdateRoom(eCtx echo.Context) error {
 }
 
 func (rc *RoomController) DeleteRoom(eCtx echo.Context) error {
-	idStr := eCtx.Param("id")
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		logger.Errorf(err.Error())
-		ReturnHTTPError(eCtx, err, http.StatusBadRequest)
-		return err
-	}
-	err = rc.roomService.DeleteRoom(id)
+	id := eCtx.Param("id")
+	err := rc.roomService.DeleteRoom(id)
 	if err != nil {
 		logger.Errorf(err.Error())
 		ReturnHTTPError(eCtx, err, http.StatusInternalServerError)

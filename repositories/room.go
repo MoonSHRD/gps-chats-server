@@ -1,12 +1,17 @@
 package repositories
 
 import (
+	"context"
 	"fmt"
+	"reflect"
+	"time"
 
-	"github.com/MoonSHRD/logger"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/MoonSHRD/sonis/app"
-	"github.com/MoonSHRD/sonis/utils"
 
 	"github.com/MoonSHRD/sonis/models"
 )
@@ -26,163 +31,168 @@ const (
 
 	// Month represents one month in seconds
 	Month = 31 * Day
+
+	RoomCollectionName = "rooms"
 )
 
 type RoomRepository struct {
-	app                    *app.App
-	chatCategoryRepository *ChatCategoryRepository
+	app          *app.App
+	dbCollection *mongo.Collection
+	ctx          context.Context
 }
 
-func NewRoomRepository(a *app.App, chatCategoryRepository *ChatCategoryRepository) *RoomRepository {
+func NewRoomRepository(a *app.App) (*RoomRepository, error) {
+	ctx := context.Background()
+	col := a.MainDatabase.Collection(RoomCollectionName)
 	roomRepo := &RoomRepository{
-		app:                    a,
-		chatCategoryRepository: chatCategoryRepository,
+		app:          a,
+		dbCollection: col,
+		ctx:          ctx,
 	}
-	roomRepo.clearExpiredRecords()
-	utils.SetInterval(func(args ...interface{}) {
-		roomRepo.clearExpiredRecords()
-	}, SecondMillisecs*30, true)
-	return roomRepo
+
+	err := roomRepo.initMongo()
+	if err != nil {
+		return nil, err
+	}
+
+	return roomRepo, nil
+}
+
+func (rr *RoomRepository) initMongo() error {
+	expiresAtIndex := mongo.IndexModel{
+		Keys: bson.M{
+			"expiresAt": 1,
+		}, Options: options.Index().SetExpireAfterSeconds(0),
+	}
+
+	_, err := rr.dbCollection.Indexes().CreateMany(rr.ctx, []mongo.IndexModel{expiresAtIndex})
+	return err
 }
 
 func (rr *RoomRepository) PutRoom(room *models.Room) (*models.Room, error) {
-	if room.TTL <= 0 {
-		return nil, fmt.Errorf("TTL is invalid")
-	}
-	stmt, err := rr.app.DBConn.Preparex(`
-		INSERT INTO rooms (latitude, longitude, ttl, room_id, parent_group_id, event_start_date, name, address) 
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, created_at;
-	`)
+	room.ID = primitive.NewObjectID()
+	err := rr.prepareRoomForInserting(room)
 	if err != nil {
 		return nil, err
 	}
+	ttlDuration := time.Duration(room.TTL)
+	now := time.Now().UTC()
+	expiresAtTime := now.Add(ttlDuration * time.Second)
+	room.ExpiresAt = expiresAtTime
+	room.CreatedAt = now
 
-	err = stmt.QueryRow(room.Latitude, room.Longitude, room.TTL, room.RoomID, room.ParentGroupID, room.EventStartDate, room.Name, room.Address).Scan(&room.ID, &room.CreatedAt)
+	res, err := rr.dbCollection.InsertOne(rr.ctx, room)
 	if err != nil {
 		return nil, err
 	}
+	room.ID = res.InsertedID.(primitive.ObjectID)
 
-	for _, x := range room.Categories {
-		stmt, err := rr.app.DBConn.Preparex("INSERT INTO roomsChatCategoriesLink (categoryId, roomId) VALUES ($1, $2);")
-		if err != nil {
-			return nil, err
-		}
-
-		_, err = stmt.Exec(x.Id, room.ID)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	seconds := room.TTL
-	if seconds > Month {
-		return nil, fmt.Errorf("creating chats for more than one month is prohibited")
-	}
 	return room, nil
+}
+
+func (rr *RoomRepository) prepareRoomForInserting(room *models.Room) error {
+	if room.TTL <= 0 {
+		return fmt.Errorf("TTL is invalid")
+	}
+	if room.TTL > Month {
+		return fmt.Errorf("creating chats for more than one month is prohibited")
+	}
+	for i, v := range room.Categories {
+		for k, j := range room.Categories { // check every element if it's already present in the array
+			if j.ID == v.ID && i != k {
+				return fmt.Errorf("two or more identical categories detected")
+			}
+		}
+	}
+
+	return nil
 }
 
 func (rr *RoomRepository) GetRoomsByCoords(userLat float64, userLon float64, radius int) (*[]models.Room, error) {
 	var rooms []models.Room
-	stmt, err := rr.app.DBConn.Preparex("SELECT * FROM rooms WHERE SQRT(POWER(latitude-$1, 2) + POWER(longitude-$2, 2)) < $3;")
+	pipeline := mongo.Pipeline{
+		{{
+			"$addFields", bson.D{{
+				"radius", bson.D{{
+					"$sqrt", bson.D{{
+						"$add", bson.A{
+							bson.D{{
+								"$pow", bson.A{
+									bson.D{{
+										"$subtract", bson.A{
+											"$latitude", userLat,
+										},
+									}},
+									2,
+								},
+							}},
+							bson.D{{
+								"$pow", bson.A{
+									bson.D{{
+										"$subtract", bson.A{
+											"$longitude", userLon,
+										},
+									}},
+									2,
+								},
+							}},
+						},
+					}},
+				}},
+			}},
+		}},
+		{{
+			"$match", bson.D{{
+				"radius", bson.D{{
+					"$lt", radius,
+				}},
+			}},
+		}},
+	}
+	cursor, err := rr.dbCollection.Aggregate(rr.ctx, pipeline)
 	if err != nil {
 		return nil, err
 	}
-	err = stmt.Select(&rooms, userLat, userLon, radius)
-	if err != nil {
+	if err = cursor.All(rr.ctx, &rooms); err != nil {
 		return nil, err
 	}
-
-	for i, room := range rooms {
-		categories, err := rr.getCategoriesByRoomID(room.ID)
-		if err != nil {
-			return nil, err
-		}
-		rooms[i].Categories = categories
-	}
-
 	if rooms == nil {
 		rooms = make([]models.Room, 0)
 	}
+
 	return &rooms, nil
 }
 
 func (rr *RoomRepository) GetRoomByRoomID(roomID string) (*models.Room, error) {
-	stmt, err := rr.app.DBConn.Preparex("SELECT * FROM rooms WHERE room_id = $1")
-	if err != nil {
-		return nil, err
-	}
-	var room models.Room
-	err = stmt.Get(&room, roomID)
-	if err != nil {
-		return nil, err
-	}
-	return &room, nil
+	return rr.findOne(bson.D{{"roomID", roomID}})
 }
 
-func (rr *RoomRepository) GetRoomByID(id int) (*models.Room, error) {
-	stmt, err := rr.app.DBConn.Preparex("SELECT * FROM rooms WHERE id = $1")
-	if err != nil {
-		return nil, err
-	}
-	var room models.Room
-	err = stmt.Get(&room, id)
-	if err != nil {
-		return nil, err
-	}
-	categories, err := rr.getCategoriesByRoomID(room.ID)
-	if err != nil {
-		return nil, err
-	}
-	room.Categories = categories
-	return &room, nil
+func (rr *RoomRepository) GetRoomByID(id primitive.ObjectID) (*models.Room, error) {
+	return rr.findOne(bson.D{{"_id", id}})
 }
 
 func (rr *RoomRepository) GetAllRooms() ([]models.Room, error) {
-	stmt, err := rr.app.DBConn.Preparex("SELECT * FROM rooms;")
-	if err != nil {
-		return nil, err
-	}
-	var rooms []models.Room
-	err = stmt.Select(&rooms)
-	if err != nil {
-		return nil, err
-	}
-
-	for i, room := range rooms {
-		categories, err := rr.getCategoriesByRoomID(room.ID)
-		if err != nil {
-			return nil, err
-		}
-		rooms[i].Categories = categories
-	}
-	if rooms == nil {
-		rooms = make([]models.Room, 0)
-	}
-	return rooms, nil
+	return rr.findMany(bson.D{{}})
 }
 
 func (rr *RoomRepository) GetRoomsByCategoryID(id int) ([]models.Room, error) {
-	stmt, err := rr.app.DBConn.Preparex(`
-		SELECT r.id, r.latitude, r.longitude, r.ttl, r.room_id, r.created_at, r.parent_group_id, r.event_start_date, r.name, r.address
-		FROM rooms as r
-		INNER JOIN roomsChatCategoriesLink AS rccl
-		ON rccl.categoryId = $1 AND rccl.roomId = r.id;
-	`)
-	if err != nil {
-		return nil, err
-	}
-	var rooms []models.Room
-	err = stmt.Select(&rooms, id)
-	if err != nil {
-		return nil, err
-	}
+	return rr.findMany(bson.D{{"categories.id", id}})
+}
 
-	for i, room := range rooms {
-		categories, err := rr.getCategoriesByRoomID(room.ID)
-		if err != nil {
-			return nil, err
-		}
-		rooms[i].Categories = categories
+func (rr *RoomRepository) findOne(filter interface{}) (*models.Room, error) {
+	var room models.Room
+	err := rr.dbCollection.FindOne(rr.ctx, filter).Decode(&room)
+	return &room, err
+}
+
+func (rr *RoomRepository) findMany(filter interface{}) ([]models.Room, error) {
+	var rooms []models.Room
+	cursor, err := rr.dbCollection.Find(rr.ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	if err = cursor.All(rr.ctx, &rooms); err != nil {
+		return nil, err
 	}
 	if rooms == nil {
 		rooms = make([]models.Room, 0)
@@ -191,154 +201,39 @@ func (rr *RoomRepository) GetRoomsByCategoryID(id int) ([]models.Room, error) {
 }
 
 func (rr *RoomRepository) GetRoomsByParentGroupID(parentGroupID string) ([]models.Room, error) {
-	stmt, err := rr.app.DBConn.Preparex(`
-		SELECT r.id, r.latitude, r.longitude, r.ttl, r.room_id, r.created_at, r.parent_group_id, r.event_start_date, r.name, r.address
-		FROM rooms as r
-		INNER JOIN roomsChatCategoriesLink AS rccl
-		ON rccl.roomId = r.id
-		WHERE r.parent_group_id = $1;
-	`)
-	if err != nil {
-		return nil, err
-	}
-	var rooms []models.Room
-	err = stmt.Select(&rooms, parentGroupID)
-	if err != nil {
-		return nil, err
-	}
-
-	for i, room := range rooms {
-		categories, err := rr.getCategoriesByRoomID(room.ID)
-		if err != nil {
-			return nil, err
-		}
-		rooms[i].Categories = categories
-	}
-	if rooms == nil {
-		rooms = make([]models.Room, 0)
-	}
-	return rooms, nil
+	return rr.findMany(bson.D{{"parentGroupID", parentGroupID}})
 }
 
 func (rr *RoomRepository) UpdateRoom(room *models.Room) (*models.Room, error) {
-	if room.TTL <= 0 {
-		return nil, fmt.Errorf("TTL is invalid")
-	}
-	if room.TTL > Month {
-		return nil, fmt.Errorf("creating chats for more than one month is prohibited")
-	}
-	args := map[string]interface{}{
-		"id":               room.ID,
-		"latitude":         room.Latitude,
-		"longitude":        room.Longitude,
-		"ttl":              room.TTL,
-		"room_id":          room.RoomID,
-		"parent_group_id":  room.ParentGroupID,
-		"event_start_date": room.EventStartDate,
-		"name":             room.Name,
-		"address":          room.Address,
-	}
-	_, err := rr.app.DBConn.NamedExec(
-		`update rooms set 
-			latitude = :latitude,
-			longitude = :longitude,
-			ttl = :ttl,
-			room_id = :room_id, 
-			parent_group_id = :parent_group_id,
-			event_start_date = :event_start_date,
-			name = :name,
-			address = :address
-		where id = :id
-	`, args)
+	err := rr.prepareRoomForInserting(room)
 	if err != nil {
 		return nil, err
 	}
-	stmt, err := rr.app.DBConn.Preparex("delete from roomschatcategorieslink where roomid = $1")
-	if err != nil {
-		return nil, err
-	}
-	_, err = stmt.Exec(room.ID)
-	if err != nil {
-		return nil, err
-	}
+	ttlDuration := time.Duration(room.TTL)
+	expiresAtTime := room.CreatedAt.Add(ttlDuration * time.Second)
+	room.ExpiresAt = expiresAtTime
 
-	for _, v := range room.Categories {
-		stmt, err := rr.app.DBConn.Preparex("insert into roomsChatCategoriesLink (categoryId, roomId) values ($1, $2);")
-		if err != nil {
-			return nil, err
+	// update all fields except ones which have "readonly" tag
+	var setElements bson.D
+	v := reflect.ValueOf(*room)
+	t := v.Type()
+	for i := 0; i < t.NumField(); i++ {
+		name := t.Field(i).Name
+		value := v.FieldByName(name).Interface()
+		fieldNameBson := t.Field(i).Tag.Get("bson")
+		if fieldNameBson == "" {
+			fieldNameBson = name
 		}
-		_, err = stmt.Exec(v.Id, room.ID)
-		if err != nil {
-			return nil, err
+		if t.Field(i).Tag.Get("readonly") != "true" {
+			setElements = append(setElements, bson.E{fieldNameBson, value})
 		}
 	}
 
-	return room, nil
+	_, err = rr.dbCollection.UpdateOne(rr.ctx, bson.D{{"_id", room.ID}}, bson.D{{"$set", setElements}})
+	return room, err
 }
 
-func (rr *RoomRepository) DeleteRoom(id int) error {
-	stmt, err := rr.app.DBConn.Preparex("delete from roomschatcategorieslink where roomid = $1")
-	if err != nil {
-		return err
-	}
-
-	_, err = stmt.Exec(id)
-	if err != nil {
-		return err
-	}
-
-	args := map[string]interface{}{
-		"id": id,
-	}
-	_, err = rr.app.DBConn.NamedExec(
-		`delete from rooms where id = :id`, args)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (rr *RoomRepository) getCategoriesByRoomID(id int) ([]models.ChatCategory, error) {
-	stmt, err := rr.app.DBConn.Preparex(`
-			SELECT cc.id, cc.categoryname
-			FROM chatCategories AS cc
-         	INNER JOIN roomsChatCategoriesLink AS rccl
-        	ON rccl.roomId = $1 AND cc.id = rccl.categoryId;
-	`)
-	if err != nil {
-		return nil, err
-	}
-	var categories []models.ChatCategory
-	err = stmt.Select(&categories, id)
-	if err != nil {
-		return nil, err
-	}
-	if categories == nil {
-		categories = make([]models.ChatCategory, 0)
-	}
-	return categories, nil
-}
-
-func (rr *RoomRepository) clearExpiredRecords() {
-	res, err := rr.app.DBConn.Exec(`
-		WITH x AS (
-			DELETE
-			FROM rooms
-			WHERE created_at <= now() AT TIME ZONE 'UTC' - interval '1 second' * rooms.ttl
-			RETURNING id
-		)
-		DELETE FROM roomsChatCategoriesLink AS rccl
-		USING x
-		WHERE rccl.roomID = x.id;
-	`)
-	if err != nil {
-		logger.Errorf("Failed to clear expired records in database! %s", err.Error())
-	}
-	rowsAffected, err := res.RowsAffected()
-	if err != nil {
-		logger.Errorf("Failed to clear expired records in database! %s", err.Error())
-	}
-	if rowsAffected > 0 {
-		logger.Infof("Cleaned up database from %d expired records", rowsAffected)
-	}
+func (rr *RoomRepository) DeleteRoom(id primitive.ObjectID) error {
+	_, err := rr.dbCollection.DeleteOne(rr.ctx, bson.D{{"_id", id}})
+	return err
 }

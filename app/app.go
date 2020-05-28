@@ -1,53 +1,66 @@
 package app
 
 import (
+	"context"
 	"fmt"
 
-	_ "github.com/lib/pq"
+	migrate "github.com/xakep666/mongo-migrate"
 
-	"github.com/MoonSHRD/sonis/app/migrations"
+	//_ "github.com/MoonSHRD/sonis/app/migrations"
 	"github.com/MoonSHRD/sonis/config"
 	"github.com/google/logger"
-	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
-	migrate "github.com/rubenv/sql-migrate"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type App struct {
-	Config *config.Config
-	DBConn *sqlx.DB
+	Config       *config.Config
+	MongoClient  *mongo.Client
+	MainDatabase *mongo.Database
 }
 
 func NewApp(config config.Config) (*App, error) {
 	app := &App{}
-	dbConn, err := initDBConn(&config)
+	mongoClient, mongoDB, err := initMongoConnection(&config)
 	if err != nil {
 		return nil, err
 	}
 	app.Config = &config
-	app.DBConn = dbConn
+	app.MongoClient = mongoClient
+	app.MainDatabase = mongoDB
 	return app, nil
 }
 
-func initDBConn(config *config.Config) (*sqlx.DB, error) {
-	var err error
-	connectionString := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%d sslmode=%s", config.PostgreSQL.User, config.PostgreSQL.Password, config.PostgreSQL.DatabaseName, config.PostgreSQL.Host, config.PostgreSQL.Port, "disable")
-	dbConnection, err := sqlx.Connect("postgres", connectionString)
+func initMongoConnection(config *config.Config) (*mongo.Client, *mongo.Database, error) {
+	var mongoURI string
+	if config.MongoDB.User == "" && config.MongoDB.Password == "" {
+		mongoURI = fmt.Sprintf("mongodb://%s:%d", config.MongoDB.Host, config.MongoDB.Port)
+	} else {
+		mongoURI = fmt.Sprintf("mongodb://%s:%s@%s:%d", config.MongoDB.User, config.MongoDB.Password, config.MongoDB.Host, config.MongoDB.Port)
+	}
+	clientOptions := options.Client().ApplyURI(mongoURI)
+	client, err := mongo.Connect(context.Background(), clientOptions)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	err = client.Ping(context.Background(), nil)
+	if err != nil {
+		return nil, nil, err
 	}
 
-	err = initDBMigrations(dbConnection)
+	db := client.Database(config.MongoDB.DatabaseName)
+	err = initDBMigrations(db)
 	if err != nil {
 		logger.Errorf("Failed to process the migrations. Reason: %s", err.Error())
-		return nil, err
+		return nil, nil, err
 	}
-	return dbConnection, nil
+	return client, db, nil
 }
 
-func initDBMigrations(conn *sqlx.DB) error {
-	_, err := migrate.Exec(conn.DB, "postgres", migrations.MigrationsList, migrate.Up)
-	return err
+func initDBMigrations(db *mongo.Database) error {
+	migrate.SetDatabase(db)
+	return migrate.Up(migrate.AllAvailable)
 }
 
 func (app *App) Run(e *echo.Echo) {

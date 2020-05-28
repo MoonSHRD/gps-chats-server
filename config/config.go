@@ -10,13 +10,13 @@ import (
 )
 
 type Config struct {
-	PostgreSQL    PostgreSQL `toml:"postgresql"`
-	HTTP          HTTP       `toml:"http"`
-	AuthServerURL string     `toml:"authServerURL"`
-	JWT           JWT        `toml:"jwt"`
+	MongoDB       MongoDB `toml:"mongoDB"`
+	HTTP          HTTP    `toml:"http"`
+	AuthServerURL string  `toml:"authServerURL"`
+	JWT           JWT     `toml:"jwt"`
 }
 
-type PostgreSQL struct {
+type MongoDB struct {
 	Host         string `toml:"host"`
 	Port         int    `toml:"port"`
 	User         string `toml:"user"`
