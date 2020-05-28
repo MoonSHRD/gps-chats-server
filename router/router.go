@@ -13,11 +13,13 @@ func NewRouter(a *app.App) (*echo.Echo, error) {
 	router.HideBanner = true
 
 	// NOTE Create repositories here
-	ccr := repositories.NewChatCategoryRepository(a)
-	rr := repositories.NewRoomRepository(a, ccr)
+	rr, err := repositories.NewRoomRepository(a)
+	if err != nil {
+		return nil, err
+	}
 
 	// NOTE Create services here
-	rs := services.NewRoomService(a, rr, ccr)
+	rs := services.NewRoomService(a, rr)
 
 	// NOTE Create controllers here
 	rc := controllers.NewRoomController(a, rs)
@@ -28,7 +30,6 @@ func NewRouter(a *app.App) (*echo.Echo, error) {
 	router.GET("/rooms/:id", rc.GetRoomByID)
 	router.GET("/rooms", rc.GetAllRooms)
 	router.GET("/rooms/byCategory/:category_id", rc.GetRoomsByCategoryID)
-	router.GET("/categories", rc.GetAllCategories)
 	router.GET("/rooms/byParentGroupId/:parent_group_id", rc.GetRoomsByParentGroupID)
 	router.PUT("/rooms/update", rc.UpdateRoom) // TODO change to "PUT /rooms"
 	router.DELETE("/rooms/:id", rc.DeleteRoom)

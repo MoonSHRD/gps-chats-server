@@ -1,6 +1,6 @@
 package models
 
 type ChatCategory struct {
-	Id           int    `json:"id" db:"id"`
-	CategoryName string `json:"categoryName" db:"categoryname"`
+	ID           int    `json:"id" bson:"categoryID"`
+	CategoryName string `json:"categoryName" bson:"categoryName"`
 }

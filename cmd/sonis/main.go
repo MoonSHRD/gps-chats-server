@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 
 	"github.com/MoonSHRD/logger"
@@ -42,7 +41,7 @@ func main() {
 
 	cfg, err := config.NewConfig(configPath)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 	}
 	app, err := app.NewApp(cfg)
 	if err != nil {

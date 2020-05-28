@@ -4,19 +4,18 @@ import (
 	"github.com/MoonSHRD/sonis/app"
 	"github.com/MoonSHRD/sonis/models"
 	"github.com/MoonSHRD/sonis/repositories"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type RoomService struct {
-	app                    *app.App
-	roomRepository         *repositories.RoomRepository
-	chatCategoryRepository *repositories.ChatCategoryRepository
+	app            *app.App
+	roomRepository *repositories.RoomRepository
 }
 
-func NewRoomService(a *app.App, rr *repositories.RoomRepository, ccr *repositories.ChatCategoryRepository) *RoomService {
+func NewRoomService(a *app.App, rr *repositories.RoomRepository) *RoomService {
 	return &RoomService{
-		app:                    a,
-		roomRepository:         rr,
-		chatCategoryRepository: ccr,
+		app:            a,
+		roomRepository: rr,
 	}
 }
 
@@ -28,8 +27,12 @@ func (rs *RoomService) GetRoomsByCoords(lat float64, lon float64, radius int) (*
 	return rs.roomRepository.GetRoomsByCoords(lat, lon, radius)
 }
 
-func (rs *RoomService) GetRoomByID(id int) (*models.Room, error) {
-	return rs.roomRepository.GetRoomByID(id)
+func (rs *RoomService) GetRoomByID(id string) (*models.Room, error) {
+	objectID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, err
+	}
+	return rs.roomRepository.GetRoomByID(objectID)
 }
 
 func (rs *RoomService) GetAllRooms() ([]models.Room, error) {
@@ -44,14 +47,14 @@ func (rs *RoomService) GetRoomsByParentGroupID(parentGroupID string) ([]models.R
 	return rs.roomRepository.GetRoomsByParentGroupID(parentGroupID)
 }
 
-func (rs *RoomService) GetAllCategories() ([]models.ChatCategory, error) {
-	return rs.chatCategoryRepository.GetAllCategories()
-}
-
 func (rs *RoomService) UpdateRoom(room *models.Room) (*models.Room, error) {
 	return rs.roomRepository.UpdateRoom(room)
 }
 
-func (rs *RoomService) DeleteRoom(id int) error {
-	return rs.roomRepository.DeleteRoom(id)
+func (rs *RoomService) DeleteRoom(id string) error {
+	objectID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+	return rs.roomRepository.DeleteRoom(objectID)
 }
