@@ -37,7 +37,7 @@ func (rc *RoomController) PutRoom(eCtx echo.Context) error {
 		ReturnHTTPError(eCtx, err, http.StatusInternalServerError)
 		return err
 	}
-	eCtx.JSON(http.StatusOK, room)
+	_ = eCtx.JSON(http.StatusOK, room)
 	return nil
 }
 
