@@ -17,12 +17,18 @@ func NewRouter(a *app.App) (*echo.Echo, error) {
 	if err != nil {
 		return nil, err
 	}
+	ttnr, err := repositories.NewTicketTypeNameRepository(a)
+	if err != nil {
+		return nil, err
+	}
 
 	// NOTE Create services here
 	rs := services.NewRoomService(a, rr)
+	ttns := services.NewTicketTypeNameService(a, ttnr)
 
 	// NOTE Create controllers here
 	rc := controllers.NewRoomController(a, rs)
+	ttnc := controllers.NewTicketTypeNameController(a, ttns)
 
 	// NOTE Add routes here
 	router.POST("/rooms/put", rc.PutRoom)
@@ -33,6 +39,12 @@ func NewRouter(a *app.App) (*echo.Echo, error) {
 	router.GET("/rooms/byParentGroupId/:parent_group_id", rc.GetRoomsByParentGroupID)
 	router.PUT("/rooms/update", rc.UpdateRoom) // TODO change to "PUT /rooms"
 	router.DELETE("/rooms/:id", rc.DeleteRoom)
+
+	router.POST("/ticketTypeNames", ttnc.PutTicketTypeName)
+	router.GET("/ticketTypeNames", ttnc.GetTicketTypeName)
+	router.PUT("/ticketTypeNames", ttnc.UpdateTicketTypeName)
+	router.DELETE("/ticketTypeNames", ttnc.DeleteTicketTypeName)
+
 
 	return router, nil
 }
