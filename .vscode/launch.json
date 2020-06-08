@@ -10,7 +10,7 @@
             "request": "launch",
             "mode": "exec",
             "program": "${workspaceFolder}/sonisd",
-            "args": ["-config", "../sonis.yaml"]
+            "args": ["-config", "../sonis.toml"]
         }
     ]
 }
