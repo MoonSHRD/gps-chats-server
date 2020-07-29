@@ -10,7 +10,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	"github.com/MoonSHRD/logger"
 	"github.com/MoonSHRD/sonis/app"
 
 	"github.com/MoonSHRD/sonis/models"
@@ -218,7 +217,6 @@ func (rr *RoomRepository) UpdateRoom(room *models.Room) (*models.Room, error) {
 	room.ID = oldRoom.ID
 	expiresAtTime := room.CreatedAt.Add(ttlDuration * time.Second)
 	room.ExpiresAt = expiresAtTime
-	logger.Infof("[DEBUG] [UpdateRoom] New room expiring date: %s", room.ExpiresAt)
 
 	// // update all fields except ones which have "readonly" tag
 	// var setElements bson.D
