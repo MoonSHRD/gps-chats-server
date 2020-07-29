@@ -4,10 +4,10 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/MoonSHRD/logger"
 	"github.com/MoonSHRD/sonis/app"
 	"github.com/MoonSHRD/sonis/models"
 	"github.com/MoonSHRD/sonis/services"
-	"github.com/google/logger"
 	"github.com/labstack/echo/v4"
 )
 

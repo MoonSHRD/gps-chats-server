@@ -5,7 +5,6 @@ go 1.13
 require (
 	github.com/MoonSHRD/logger v1.0.3
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
-	github.com/google/logger v1.1.0
 	github.com/labstack/echo/v4 v4.1.11
 	github.com/pelletier/go-toml v1.6.0
 	github.com/xakep666/mongo-migrate v0.2.1

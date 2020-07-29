@@ -7,8 +7,8 @@ import (
 	migrate "github.com/xakep666/mongo-migrate"
 
 	//_ "github.com/MoonSHRD/sonis/app/migrations"
+	"github.com/MoonSHRD/logger"
 	"github.com/MoonSHRD/sonis/config"
-	"github.com/google/logger"
 	"github.com/labstack/echo/v4"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
