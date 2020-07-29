@@ -94,7 +94,7 @@ func (rr *RoomRepository) prepareRoomForInserting(room *models.Room) error {
 	if room.TTL <= 0 {
 		return fmt.Errorf("TTL is invalid")
 	}
-	if room.TTL > Month {
+	if room.TTL > 3*Month {
 		return fmt.Errorf("creating chats for more than one month is prohibited")
 	}
 	for i, v := range room.Categories {
