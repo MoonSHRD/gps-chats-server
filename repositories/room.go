@@ -3,7 +3,6 @@ package repositories
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -11,6 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
+	"github.com/MoonSHRD/logger"
 	"github.com/MoonSHRD/sonis/app"
 
 	"github.com/MoonSHRD/sonis/models"
@@ -210,26 +210,33 @@ func (rr *RoomRepository) UpdateRoom(room *models.Room) (*models.Room, error) {
 		return nil, err
 	}
 	ttlDuration := time.Duration(room.TTL)
+	oldRoom, err := rr.findOne(bson.M{"_id": room.ID})
+	if err != nil {
+		return nil, err
+	}
+	room.CreatedAt = oldRoom.CreatedAt
+	room.ID = oldRoom.ID
 	expiresAtTime := room.CreatedAt.Add(ttlDuration * time.Second)
 	room.ExpiresAt = expiresAtTime
+	logger.Infof("[DEBUG] [UpdateRoom] New room expiring date: %s", room.ExpiresAt)
 
-	// update all fields except ones which have "readonly" tag
-	var setElements bson.D
-	v := reflect.ValueOf(*room)
-	t := v.Type()
-	for i := 0; i < t.NumField(); i++ {
-		name := t.Field(i).Name
-		value := v.FieldByName(name).Interface()
-		fieldNameBson := t.Field(i).Tag.Get("bson")
-		if fieldNameBson == "" {
-			fieldNameBson = name
-		}
-		if t.Field(i).Tag.Get("readonly") != "true" {
-			setElements = append(setElements, bson.E{fieldNameBson, value})
-		}
-	}
+	// // update all fields except ones which have "readonly" tag
+	// var setElements bson.D
+	// v := reflect.ValueOf(*room)
+	// t := v.Type()
+	// for i := 0; i < t.NumField(); i++ {
+	// 	name := t.Field(i).Name
+	// 	value := v.FieldByName(name).Interface()
+	// 	fieldNameBson := t.Field(i).Tag.Get("bson")
+	// 	if fieldNameBson == "" {
+	// 		fieldNameBson = name
+	// 	}
+	// 	if t.Field(i).Tag.Get("readonly") != "true" {
+	// 		setElements = append(setElements, bson.E{fieldNameBson, value})
+	// 	}
+	// }
 
-	_, err = rr.dbCollection.UpdateOne(rr.ctx, bson.D{{"_id", room.ID}}, bson.D{{"$set", setElements}})
+	_, err = rr.dbCollection.UpdateOne(rr.ctx, bson.D{{"_id", room.ID}}, bson.D{{"$set", room}})
 	return room, err
 }
 
